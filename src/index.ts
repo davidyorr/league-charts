@@ -1,183 +1,257 @@
-import { api } from "./api";
+import { loadImage } from "canvas";
 
-import { CanvasRenderService } from "chartjs-node-canvas";
-import { writeFile } from "fs";
+import { ChampionMap, RiotApi } from "./api";
+import { Colors } from "./colors";
 
-(async () => {
-  const response = await api.summoner.byName("AudreyRuston");
-  console.log(response.data);
+import {
+  Chart,
+  ChartColor,
+  ChartConfiguration,
+  ChartData,
+  ChartOptions,
+  ChartPoint,
+  PluginServiceRegistrationOptions,
+  Scriptable,
+} from "chart.js";
 
-  const b = await api.matchList.byAccountId(response.data.accountId);
-  console.log(b.data);
+type FunctionParams = {
+  chartContext: any;
+  summonerName: string;
+  chartOptions?: ChartOptions;
+  chartPlugins?: PluginServiceRegistrationOptions[];
+  afterRender?: Function;
+};
 
-  const c = await api.match.byMatchId(b.data.matches[0].gameId);
-  // console.log(c.data.participants);
-  c.data.participantIdentities.forEach((identity) => {
-    console.log(identity.player.summonerName);
-  });
-  c.data.participants.forEach((participant, i) => {
-    console.log(
-      `${c.data.participantIdentities[i].player.summonerName}: ${participant.stats.totalDamageDealtToChampions}`
-    );
-  });
+export class LeagueCharts {
+  #api: RiotApi;
+  #champions?: ChampionMap;
 
-  const data: Chart.ChartData = {
-    datasets: [
-      {
-        data: c.data.participants.map(
-          (participant) => participant.stats.totalDamageDealtToChampions
-        ),
-        backgroundColor: [
-          "rgba(2,62,138,0.5)",
-          "rgba(2,62,138,0.5)",
-          "rgba(2,62,138,0.5)",
-          "rgba(2,62,138,0.5)",
-          "rgba(2,62,138,0.5)",
-          "rgba(133,24,42,0.5)",
-          "rgba(133,24,42,0.5)",
-          "rgba(133,24,42,0.5)",
-          "rgba(133,24,42,0.5)",
-          "rgba(133,24,42,0.5)",
-        ],
-        borderColor: [
-          "rgba(2,62,138,1)",
-          "rgba(2,62,138,1)",
-          "rgba(2,62,138,1)",
-          "rgba(2,62,138,1)",
-          "rgba(2,62,138,1)",
-          "rgba(133,24,42,1)",
-          "rgba(133,24,42,1)",
-          "rgba(133,24,42,1)",
-          "rgba(133,24,42,1)",
-          "rgba(133,24,42,1)",
-        ],
-        borderWidth: 1,
-        label: "",
-      },
-    ],
-    labels: c.data.participantIdentities.map(
-      (identity) => identity.player.summonerName
-    ),
-  };
+  constructor(apiKey: string) {
+    this.#api = new RiotApi(apiKey);
 
-  const options: Chart.ChartOptions = {
-    legend: {
-      display: false,
-    },
-    scales: {
-      xAxes: [
-        {
-          ticks: {
-            beginAtZero: true,
-          },
-        },
-      ],
-    },
-    title: {
-      display: true,
-      fontSize: 16,
-      fontStyle: "normal",
-      text: "Damage to champions",
-    },
-  };
+    Chart.defaults.global.defaultFontColor = Colors.text;
+    Chart.defaults.global.defaultFontStyle = "normal";
 
-  // const chart = new Chart()
-  let canvasRenderService = new CanvasRenderService(500, 500);
-
-  const configuration: Chart.ChartConfiguration = {
-    type: "horizontalBar",
-    data,
-    options,
-  };
-
-  let image = await canvasRenderService.renderToBuffer(
-    configuration,
-    "image/jpeg"
-  );
-  // const dataUrl = await canvasRenderService.renderToDataURL(configuration);
-
-  writeFile("chart.jpeg", image, (err) => {
-    if (err) {
-      console.log("error writing file jpeg", err);
-    } else {
-      console.log("wrote file jpeg");
-    }
-  });
-
-  image = await canvasRenderService.renderToBuffer(configuration, "image/png");
-
-  writeFile("chart.png", image, (err) => {
-    if (err) {
-      console.log("error writing file png", err);
-    } else {
-      console.log("wrote file png");
-    }
-  });
-
-  // timeline
-
-  function millisToMinutesAndSeconds(millis: number) {
-    const minutes = Math.floor(millis / 60000);
-    const seconds = parseInt(((millis % 60000) / 1000).toFixed(0));
-    return minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+    this.#api
+      .champions()
+      .then((championResponse) => {
+        this.#champions = championResponse.data;
+      })
+      .catch((err) => {
+        console.log("error fetching champion.json", err);
+      });
   }
 
-  const d = await api.timeline.byMatchId(b.data.matches[0].gameId);
-  const timeline = d.data;
-
-  // type GoldDataPoint = {
-  //   x: number; // time
-  //   y: number; // gold
-  // };
-
-  const goldDataPoints: Chart.ChartPoint[] = [];
-  let max = 0;
-
-  timeline.frames.forEach((frame) => {
-    const gold = Object.values(frame.participantFrames).reduce<number>(
-      (total, participantFrame) => {
-        // console.log(participantFrame.particpantId);
-        if (participantFrame.participantId > 5) {
-          return total + participantFrame.totalGold;
-        } else {
-          return total - participantFrame.totalGold;
-        }
-      },
-      0
+  private async getLastMatchResponse(summonerName: string) {
+    const summonerResponse = await this.#api.summoner.byName(summonerName);
+    const matchListResponse = await this.#api.matchList.byAccountId(
+      summonerResponse.data.accountId
     );
-    goldDataPoints.push({
-      x: Math.floor(frame.timestamp / 1000 / 60),
-      y: gold,
-    });
+    const matchResponse = await this.#api.match.byMatchId(
+      matchListResponse.data.matches[0].gameId
+    );
 
-    if (gold > 0) {
-      if (gold > max) {
-        max = gold;
-      }
-    } else {
-      if (-gold > max) {
-        max = gold;
+    return matchResponse;
+  }
+
+  private convertValueToKilos(value: string | number) {
+    return Math.abs(Number(value)) / 1000 + "K";
+  }
+
+  async championDamage({
+    chartContext,
+    summonerName,
+    chartOptions,
+    chartPlugins,
+    afterRender,
+  }: FunctionParams): Promise<Chart> {
+    const matchResponse = await this.getLastMatchResponse(summonerName);
+    const icons = this.#champions
+      ? matchResponse.data.participantIdentities.map((_, index) => {
+          const imageName = (this.#champions as ChampionMap)[
+            matchResponse.data.participants[index].championId
+          ].image.full;
+          return this.#api.championImageUrl(imageName);
+        })
+      : [];
+
+    const data: ChartData = {
+      datasets: [
+        {
+          data: matchResponse.data.participants.map(
+            (participant) => participant.stats.totalDamageDealtToChampions
+          ),
+          backgroundColor: (({ dataIndex = 0 }) =>
+            dataIndex < 5 ? Colors.lightBlue : Colors.lightRed) as Scriptable<
+            ChartColor
+          >,
+          borderColor: (({ dataIndex = 0 }) =>
+            dataIndex < 5 ? Colors.blue : Colors.red) as Scriptable<ChartColor>,
+          borderWidth: 1,
+          label: undefined,
+        },
+      ],
+      labels: matchResponse.data.participantIdentities.map(
+        (identity) => identity.player.summonerName
+      ),
+    };
+
+    const options: ChartOptions = {
+      legend: {
+        display: false,
+      },
+      scales: {
+        xAxes: [
+          {
+            ticks: {
+              beginAtZero: true,
+              callback: this.convertValueToKilos,
+            },
+          },
+        ],
+        yAxes: [
+          {
+            ticks: {
+              padding: 36,
+            },
+          },
+        ],
+      },
+      title: {
+        display: true,
+        fontSize: 16,
+        fontStyle: "normal",
+        text: "Damage to champions",
+      },
+    };
+
+    const imagePromises: Array<Promise<any>> = [];
+
+    const plugins: PluginServiceRegistrationOptions[] = [
+      {
+        afterRender: (chart) => {
+          if (icons.length > 0) {
+            const IMAGE_SIZE = 24;
+
+            const yAxis = (chart as any).scales["y-axis-0"];
+            yAxis.ticks.forEach((_: any, index: number) => {
+              const y = yAxis.getPixelForTick(index);
+
+              imagePromises.push(
+                loadImage(icons[index]).then((image) => {
+                  chart.ctx?.drawImage(
+                    image as any,
+                    yAxis.right - IMAGE_SIZE - IMAGE_SIZE / 2,
+                    y - IMAGE_SIZE / 2,
+                    IMAGE_SIZE,
+                    IMAGE_SIZE
+                  );
+                })
+              );
+            });
+
+            Promise.all(imagePromises).then(() => {
+              if (afterRender) {
+                afterRender();
+              }
+            });
+          }
+        },
+      },
+    ];
+
+    const configuration: ChartConfiguration = {
+      type: "horizontalBar",
+      data,
+      options: {
+        ...options,
+        ...(chartOptions ?? {}),
+      },
+      plugins: [...plugins, ...(chartPlugins ?? [])],
+    };
+
+    return new Chart(chartContext, configuration);
+  }
+
+  async teamGoldAdvantage({
+    chartContext,
+    summonerName,
+    chartOptions,
+    chartPlugins,
+    afterRender,
+  }: FunctionParams): Promise<Chart> {
+    const matchResponse = await this.getLastMatchResponse(summonerName);
+    let timelineResponse;
+    try {
+      timelineResponse = await this.#api.timeline.byMatchId(
+        matchResponse.data.gameId
+      );
+    } catch (error) {
+      console.log("error", error);
+    }
+    const timeline = timelineResponse?.data;
+
+    const goldDataPoints: ChartPoint[] = [];
+    let max = 0;
+
+    const summonerParticipantId =
+      matchResponse.data.participantIdentities.find(
+        (particiantIdentity) =>
+          particiantIdentity.player.summonerName.toLowerCase() ===
+          summonerName.toLowerCase()
+      )?.participantId ?? 1;
+
+    // as in the top part of the chart, the positive numbers, the blue
+    function isTopTeam(participantId: number) {
+      if (summonerParticipantId <= 5) {
+        return participantId <= 5;
+      } else {
+        return participantId > 5;
       }
     }
 
-    console.log(`${millisToMinutesAndSeconds(frame.timestamp)} - ${gold}`);
-  });
-  console.log(goldDataPoints);
+    timeline?.frames.forEach((frame) => {
+      const gold = Object.values(frame.participantFrames).reduce<number>(
+        (total, participantFrame) => {
+          if (isTopTeam(participantFrame.participantId)) {
+            return total + participantFrame.totalGold;
+          } else {
+            return total - participantFrame.totalGold;
+          }
+        },
+        0
+      );
+      goldDataPoints.push({
+        x: Math.floor(frame.timestamp / 1000 / 60),
+        y: gold,
+      });
 
-  max = Math.round(max / 1000) * 1000;
+      if (gold > 0) {
+        if (gold > max) {
+          max = gold;
+        }
+      } else {
+        if (-gold > max) {
+          max = -gold;
+        }
+      }
+    });
 
-  const conf: Chart.ChartConfiguration = {
-    type: "line",
-    data: {
+    max = Math.round(max / 1000) * 1000;
+
+    const data: ChartData = {
       datasets: [
         {
           data: goldDataPoints,
-          backgroundColor: "red",
+          borderColor: "rgba(40, 40, 40, 0.7)",
         },
       ],
-      labels: goldDataPoints.map((val) => val.x),
-    },
-    options: {
+      labels: goldDataPoints.map((val) => val.x ?? ""),
+    };
+    const options: ChartOptions = {
+      legend: {
+        display: false,
+      },
       title: {
         display: true,
         text: "Team Gold Advantage",
@@ -185,61 +259,92 @@ import { writeFile } from "fs";
       scales: {
         xAxes: [
           {
+            type: "linear",
+            gridLines: {
+              display: false,
+            },
             ticks: {
-              callback: (value) => {
-                console.log(
-                  "t",
-                  parseInt(value as string) % 5 === 0
-                    ? value + ":00"
-                    : undefined
-                );
-                // return value + ":00";
-                return parseInt(value as string) % 5 === 0
-                  ? `${value}`
-                  : undefined;
-              },
-
-              maxRotation: 360,
-              minRotation: 360,
-              // precision: 5,
-              // stepSize: 5,
+              // doing the mod here instead of using stepSize because otherwise it
+              // would show the last number as well even if it wasn't divisible by 5
+              callback: (value) =>
+                Number(value) % 5 === 0 ? `${value}:00` : "",
+              min: 0,
+              max: goldDataPoints.length - 1,
+              autoSkip: false,
             },
           },
         ],
         yAxes: [
           {
             ticks: {
-              callback: (value) =>
-                Math.abs(parseInt(value as string)) / 1000 + "K",
+              callback: this.convertValueToKilos,
               min: -max,
               max: max,
+              autoSkip: false,
+              stepSize: 2000,
             },
           },
         ],
       },
-    },
-  };
+    };
 
-  canvasRenderService = new CanvasRenderService(800, 400);
+    const plugins: PluginServiceRegistrationOptions[] = [
+      {
+        afterRender: () => {
+          if (afterRender) {
+            afterRender();
+          }
+        },
+        beforeRender: function (chartInstance) {
+          const data = chartInstance.data;
+          if (data !== undefined && data.datasets) {
+            if (
+              (chartInstance as any).scales &&
+              (chartInstance as any).scales["y-axis-0"]
+            ) {
+              const yScale = (chartInstance as any).scales["y-axis-0"];
+              const y = yScale.getPixelForValue(0);
 
-  image = await canvasRenderService.renderToBuffer(conf, "image/jpeg");
-  // const dataUrl = await canvasRenderService.renderToDataURL(configuration);
+              const gradientFill = chartInstance.ctx?.createLinearGradient(
+                0,
+                0,
+                0,
+                chartInstance.height ?? 0
+              );
+              if (gradientFill) {
+                gradientFill.addColorStop(0, Colors.lightBlue);
+                gradientFill.addColorStop(
+                  y / (chartInstance.height ?? 0) - 0.0001,
+                  Colors.lightBlue
+                );
+                gradientFill.addColorStop(
+                  y / (chartInstance.height ?? 0) + 0.0001,
+                  Colors.lightRed
+                );
+                gradientFill.addColorStop(1, Colors.lightRed);
 
-  writeFile("gold.jpeg", image, (err) => {
-    if (err) {
-      console.log("error writing file jpeg", err);
-    } else {
-      console.log("wrote file jpeg");
-    }
-  });
+                const model = (chartInstance.getDatasetMeta(0).dataset as any)
+                  ?._model;
+                if (model) {
+                  model.backgroundColor = gradientFill;
+                }
+              }
+            }
+          }
+        },
+      },
+    ];
 
-  image = await canvasRenderService.renderToBuffer(conf, "image/png");
+    const configuration: Chart.ChartConfiguration = {
+      type: "line",
+      data,
+      options: {
+        ...options,
+        ...(chartOptions ?? {}),
+      },
+      plugins: [...plugins, ...(chartPlugins ?? [])],
+    };
 
-  writeFile("gold.png", image, (err) => {
-    if (err) {
-      console.log("error writing file png", err);
-    } else {
-      console.log("wrote file png");
-    }
-  });
-})();
+    return new Chart(chartContext, configuration);
+  }
+}
