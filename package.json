@@ -6,6 +6,10 @@
   "repository": "git@github.com:davidyorr/league-charts.git",
   "author": "David Orr <davidyorr@gmail.com>",
   "license": "MIT",
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
   "scripts": {
     "build": "yarn run tsc",
     "start": "node dist/index.js",
