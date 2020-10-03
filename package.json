@@ -12,7 +12,6 @@
   ],
   "scripts": {
     "build": "yarn run tsc",
-    "start": "node dist/index.js",
     "storybook": "concurrently \"tsc --watch\" \"start-storybook -p 6006\""
   },
   "devDependencies": {
