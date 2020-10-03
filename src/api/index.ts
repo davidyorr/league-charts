@@ -1,12 +1,4 @@
-import axios from "axios";
-import { DEV_TOKEN } from "../token.dev";
-
-const instance = axios.create({
-  baseURL: "https://na1.api.riotgames.com/lol/",
-  headers: {
-    "X-Riot-Token": DEV_TOKEN,
-  },
-});
+import axios, { AxiosInstance } from "axios";
 
 // Summoner
 // ----------------
@@ -19,14 +11,6 @@ type SummonerDto = {
   id: string;
   puuid: string;
   summonerLevel: number;
-};
-
-const summoner = {
-  byName: (summonerName: string) => {
-    return instance.get<SummonerDto>(
-      `summoner/v4/summoners/by-name/${summonerName}`
-    );
-  },
 };
 
 // Match
@@ -82,12 +66,6 @@ type ParticipantStatsDto = {
   totalDamageDealtToChampions: number;
 };
 
-const match = {
-  byMatchId: (matchId: number) => {
-    return instance.get<MatchDto>(`match/v4/matches/${matchId}`);
-  },
-};
-
 // Match List
 // ----------------
 
@@ -107,14 +85,6 @@ type MatchListDto = {
   totalGames: number;
   endIndex: number;
   matches: MatchReferenceDto[];
-};
-
-const matchList = {
-  byAccountId: (accountId: string) => {
-    return instance.get<MatchListDto>(
-      `match/v4/matchlists/by-account/${accountId}?endIndex=1`
-    );
-  },
 };
 
 // Timelines
@@ -190,17 +160,117 @@ type MatchEventDto = {
   victimId: number;
 };
 
-const timeline = {
-  byMatchId: (matchId: number) => {
-    return instance.get<MatchTimelineDto>(
-      `match/v4/timelines/by-match/${matchId}?endIndex=1`
-    );
-  },
+// Data Dragon champion.json
+// ----------------
+
+type ChampionJson = {
+  type: string;
+  format: string;
+  version: string;
+  data: ChampionDto[];
 };
 
-export const api = {
-  summoner,
-  match,
-  matchList,
-  timeline,
+type ChampionDto = {
+  version: string;
+  id: string;
+  key: string;
+  name: string;
+  title: string;
+  blurb: string;
+  info: {
+    attack: number;
+    defense: number;
+    magic: number;
+    difficulty: number;
+  };
+  image: {
+    full: string;
+    sprite: string;
+    group: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+  tags: string[];
+  partype: string;
+  stats: any;
 };
+
+export type ChampionMap = {
+  [index: string]: ChampionDto;
+};
+
+const X_RIOT_TOKEN_HEADER = "X-Riot-Token";
+
+export class RiotApi {
+  #instance: AxiosInstance;
+
+  constructor(apiKey: string) {
+    this.#instance = axios.create({
+      baseURL: "https://na1.api.riotgames.com/lol/",
+      headers: {
+        [X_RIOT_TOKEN_HEADER]: apiKey,
+      },
+    });
+  }
+
+  champions = () => {
+    return this.#instance.get<ChampionMap>(
+      "https://ddragon.leagueoflegends.com/cdn/10.20.1/data/en_US/champion.json",
+      {
+        transformRequest: (_, headers) => {
+          delete headers[X_RIOT_TOKEN_HEADER];
+        },
+        transformResponse: (data: string | undefined) => {
+          if (data) {
+            const championJson: ChampionJson = JSON.parse(data);
+            const championMap: ChampionMap = {};
+
+            Object.values(championJson.data).forEach((championDto) => {
+              championMap[championDto.key] = championDto;
+            });
+
+            return championMap;
+          }
+
+          return data;
+        },
+      }
+    );
+  };
+
+  championImageUrl = (imageName: string) => {
+    return `https://ddragon.leagueoflegends.com/cdn/10.20.1/img/champion/${imageName}`;
+  };
+
+  summoner = {
+    byName: (summonerName: string) => {
+      return this.#instance.get<SummonerDto>(
+        `summoner/v4/summoners/by-name/${summonerName}`
+      );
+    },
+  };
+
+  match = {
+    byMatchId: (matchId: number) => {
+      return this.#instance.get<MatchDto>(`match/v4/matches/${matchId}`);
+    },
+  };
+
+  matchList = {
+    byAccountId: (accountId: string) => {
+      return this.#instance.get<MatchListDto>(
+        `match/v4/matchlists/by-account/${accountId}?endIndex=1`
+      );
+    },
+  };
+
+  timeline = {
+    byMatchId: (matchId: number) => {
+      return this.#instance.get<MatchTimelineDto>(
+        `match/v4/timelines/by-match/${matchId}?endIndex=1`
+      );
+    },
+  };
+}
