@@ -61,9 +61,34 @@ type ParticipantDto = {
   masteries: any[];
 };
 
-type ParticipantStatsDto = {
+export type ParticipantStatsDto = {
+  totalUnitsHealed: number;
+  largestMultiKill: number;
   goldEarned: number;
+  physicalDamageTaken: number;
+  totalPlayerScore: number;
+  champLevel: number;
+  damageDealtToObjectives: number;
+  totalDamageTaken: number;
+  neutralMinionsKilled: number;
+  deaths: number;
+  tripleKills: number;
+  magicDamageDealtToChampions: number;
+  wardsKilled: number;
+  pentaKills: number;
+  damageSelfMitigated: number;
+  largestCriticalStrike: number;
+  totalTimeCrowdControlDealt: number;
+  magicDamageDealt: number;
+  wardsPlaced: number;
+  totalDamageDealt: number;
+  timeCCingOthers: number;
+  largestKillingSpree: number;
   totalDamageDealtToChampions: number;
+  physicalDamageDealtToChampions: number;
+  neutralMinionsKilledTeamJungle: number;
+  totalMinionsKilled: number;
+  visionScore: number;
 };
 
 // Match List

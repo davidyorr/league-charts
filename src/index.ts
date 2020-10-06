@@ -1,6 +1,6 @@
 import { loadImage } from "canvas";
 
-import { ChampionMap, RiotApi } from "./api";
+import { ChampionMap, RiotApi, ParticipantStatsDto } from "./api";
 import { Colors } from "./colors";
 
 import {
@@ -21,9 +21,9 @@ type FunctionParams = {
   chartPlugins?: PluginServiceRegistrationOptions[];
   afterRender?: Function;
 };
-
 export class LeagueCharts {
   #api: RiotApi;
+  #championsPromise: Promise<void>;
   #champions?: ChampionMap;
 
   constructor(apiKey: string) {
@@ -32,7 +32,7 @@ export class LeagueCharts {
     Chart.defaults.global.defaultFontColor = Colors.text;
     Chart.defaults.global.defaultFontStyle = "normal";
 
-    this.#api
+    this.#championsPromise = this.#api
       .champions()
       .then((championResponse) => {
         this.#champions = championResponse.data;
@@ -58,13 +58,23 @@ export class LeagueCharts {
     return Math.abs(Number(value)) / 1000 + "K";
   }
 
-  async championDamage({
+  private convertToStartCase(value: string) {
+    return value
+      .replace(/[A-Z]/g, (str) => ` ${str}`)
+      .replace(/^./g, (str) => str.toUpperCase());
+  }
+
+  async barChart({
     chartContext,
     summonerName,
     chartOptions,
     chartPlugins,
     afterRender,
-  }: FunctionParams): Promise<Chart> {
+    chartStat,
+  }: FunctionParams & {
+    chartStat: keyof ParticipantStatsDto;
+  }): Promise<Chart> {
+    await this.#championsPromise;
     const matchResponse = await this.getLastMatchResponse(summonerName);
     const icons = this.#champions
       ? matchResponse.data.participantIdentities.map((_, index) => {
@@ -74,13 +84,18 @@ export class LeagueCharts {
           return this.#api.championImageUrl(imageName);
         })
       : [];
+    let max = 0;
 
     const data: ChartData = {
       datasets: [
         {
-          data: matchResponse.data.participants.map(
-            (participant) => participant.stats.totalDamageDealtToChampions
-          ),
+          data: matchResponse.data.participants.map((participant) => {
+            const value = participant.stats[chartStat];
+            if (value > max) {
+              max = value;
+            }
+            return value;
+          }),
           backgroundColor: (({ dataIndex = 0 }) =>
             dataIndex < 5 ? Colors.lightBlue : Colors.lightRed) as Scriptable<
             ChartColor
@@ -105,7 +120,8 @@ export class LeagueCharts {
           {
             ticks: {
               beginAtZero: true,
-              callback: this.convertValueToKilos,
+              callback: (value) =>
+                max >= 1000 ? this.convertValueToKilos(value) : value,
             },
           },
         ],
@@ -119,9 +135,7 @@ export class LeagueCharts {
       },
       title: {
         display: true,
-        fontSize: 16,
-        fontStyle: "normal",
-        text: "Damage to champions",
+        text: this.convertToStartCase(chartStat),
       },
     };
 

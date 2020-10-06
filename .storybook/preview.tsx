@@ -8,7 +8,7 @@ export const parameters = {
       },
       {
         name: "white",
-        value: "#000000",
+        value: "#fff",
       },
     ],
   },
