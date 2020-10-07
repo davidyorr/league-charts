@@ -1,6 +1,11 @@
 import { loadImage } from "canvas";
 
-import { ChampionMap, RiotApi, ParticipantStatsDto } from "./api";
+import {
+  ChampionMap,
+  MatchParticipantFrameDto,
+  RiotApi,
+  ParticipantStatsDto,
+} from "./api";
 import { Colors } from "./colors";
 
 import {
@@ -187,13 +192,19 @@ export class LeagueCharts {
     return new Chart(chartContext, configuration);
   }
 
-  async teamGoldAdvantage({
+  async lineChart({
     chartContext,
     summonerName,
     chartOptions,
     chartPlugins,
     afterRender,
-  }: FunctionParams): Promise<Chart> {
+    chartStat,
+  }: FunctionParams & {
+    chartStat: Exclude<
+      keyof MatchParticipantFrameDto,
+      "participantId" | "position"
+    >;
+  }): Promise<Chart> {
     const matchResponse = await this.getLastMatchResponse(summonerName);
     let timelineResponse;
     try {
@@ -228,9 +239,9 @@ export class LeagueCharts {
       const gold = Object.values(frame.participantFrames).reduce<number>(
         (total, participantFrame) => {
           if (isTopTeam(participantFrame.participantId)) {
-            return total + participantFrame.totalGold;
+            return total + participantFrame[chartStat];
           } else {
-            return total - participantFrame.totalGold;
+            return total - participantFrame[chartStat];
           }
         },
         0
@@ -251,7 +262,9 @@ export class LeagueCharts {
       }
     });
 
-    max = Math.round(max / 1000) * 1000;
+    if (max >= 1000) {
+      max = Math.round(max / 1000) * 1000;
+    }
 
     const data: ChartData = {
       datasets: [
@@ -268,7 +281,9 @@ export class LeagueCharts {
       },
       title: {
         display: true,
-        text: "Team Gold Advantage",
+        text: `Team ${this.convertToStartCase(
+          chartStat === "totalGold" ? "gold" : chartStat
+        )} Advantage`,
       },
       scales: {
         xAxes: [
@@ -291,11 +306,12 @@ export class LeagueCharts {
         yAxes: [
           {
             ticks: {
-              callback: this.convertValueToKilos,
+              callback: (value) =>
+                max >= 1000 ? this.convertValueToKilos(value) : value,
               min: -max,
               max: max,
               autoSkip: false,
-              stepSize: 2000,
+              stepSize: max >= 1000 ? 2000 : undefined,
             },
           },
         ],

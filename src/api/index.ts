@@ -128,7 +128,7 @@ type MatchFrameDto = {
   timestamp: number;
 };
 
-type MatchParticipantFrameDto = {
+export type MatchParticipantFrameDto = {
   participantId: number;
   minionsKilled: number;
   teamScore: number;

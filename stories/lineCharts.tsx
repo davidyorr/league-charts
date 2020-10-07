@@ -10,6 +10,7 @@ import { summonerDto } from "./mock/summoner";
 import { matchListDto } from "./mock/match-list";
 import { matchDto } from "./mock/match";
 import { timelineDto } from "./mock/timeline";
+import { MatchParticipantFrameDto } from "../src/api";
 
 const mock = new MockAdapter(axios);
 mock.reset();
@@ -31,24 +32,64 @@ mock
   .onAny()
   .passThrough();
 
-export const Story = () => {
+export const Story: {
+  args: {
+    stat: Exclude<keyof MatchParticipantFrameDto, "participantId" | "position">;
+  };
+} = ({
+  stat,
+}: {
+  stat: Exclude<keyof MatchParticipantFrameDto, "participantId" | "position">;
+}) => {
   useEffect(() => {
     const leagueCharts = new LeagueCharts("api key");
-    leagueCharts.teamGoldAdvantage({
+    leagueCharts.lineChart({
+      chartStat: stat,
       chartContext: document.getElementById("team-gold-advantage-chart"),
       summonerName: "AudreyRuston",
       chartOptions: {
         responsive: false,
       },
+      afterRender: () => {
+        console.log("passed callback");
+      },
     });
-  }, []);
+  }, [stat]);
 
   return (
     <canvas id="team-gold-advantage-chart" width="800" height="400"></canvas>
   );
 };
 
+Story.args = {
+  stat: "totalGold",
+};
+
+const options: {
+  [stat in Exclude<
+    keyof MatchParticipantFrameDto,
+    "participantId" | "position"
+  >]: any;
+} = {
+  currentGold: 0,
+  dominionScore: 0,
+  jungleMinionsKilled: 0,
+  level: 0,
+  minionsKilled: 0,
+  teamScore: 0,
+  totalGold: 0,
+  xp: 0,
+};
+
 export default {
   title: "Line Charts",
   decorators: [(story: any) => story()],
+  argTypes: {
+    stat: {
+      control: {
+        type: "select",
+        options: Object.keys(options),
+      },
+    },
+  },
 };
