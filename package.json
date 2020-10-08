@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "build": "yarn run tsc",
-    "storybook": "concurrently \"tsc --watch\" \"start-storybook -p 6006\""
+    "storybook": "concurrently \"tsc --watch\" \"start-storybook -p 6006\"",
+    "storybook:build": "build-storybook --output-dir ./public/storybook"
   },
   "devDependencies": {
     "@storybook/addon-backgrounds": "^6.0.26",
