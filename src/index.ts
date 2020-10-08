@@ -117,6 +117,7 @@ export class LeagueCharts {
     };
 
     const options: ChartOptions = {
+      events: [],
       legend: {
         display: false,
       },
