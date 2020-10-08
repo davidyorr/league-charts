@@ -6,19 +6,20 @@ on:
       - master
       
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
         with:
           node-version: 12
-          
-      - name: Build Storybook
-      - run: yarn storybook:build
+      - run: yarn run storybook:build
         
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
