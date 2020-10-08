@@ -14,9 +14,11 @@ jobs:
         with:
           node-version: 12
           
+      - name: Install
+        run: yarn install
+          
       - name: Build Storybook
-      - run: yarn install
-      - run: yarn storybook:build
+        run: yarn storybook:build
         
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
