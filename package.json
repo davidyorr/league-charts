@@ -11,7 +11,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "yarn run tsc",
+    "build": "yarn run tsc --extendedDiagnostics",
     "storybook": "concurrently \"tsc --watch\" \"start-storybook -p 6006\"",
     "storybook:build": "build-storybook --output-dir ./public/storybook"
   },
