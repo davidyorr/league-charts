@@ -1,15 +1,12 @@
-import React from "react";
-
-import { useEffect } from "@storybook/client-api";
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
-
 import { LeagueCharts } from "../src/index";
+import MockAdapter from "axios-mock-adapter";
 import { ParticipantStatsDto } from "../src/api/index";
-
-import { summonerDto } from "./mock/summoner";
-import { matchListDto } from "./mock/match-list";
+import React from "react";
+import axios from "axios";
 import { matchDto } from "./mock/match";
+import { matchListDto } from "./mock/match-list";
+import { summonerDto } from "./mock/summoner";
+import { useEffect } from "@storybook/client-api";
 
 const mock = new MockAdapter(axios);
 mock.reset();

@@ -1,12 +1,9 @@
-import { loadImage } from "canvas";
-
 import {
   ChampionMap,
   MatchParticipantFrameDto,
-  RiotApi,
   ParticipantStatsDto,
+  RiotApi,
 } from "./api";
-import { Colors } from "./colors";
 
 import {
   Chart,
@@ -19,12 +16,15 @@ import {
   Scriptable,
 } from "chart.js";
 
+import { Colors } from "./colors";
+import { loadImage } from "canvas";
+
 type FunctionParams = {
   chartContext: any;
   summonerName: string;
   chartOptions?: ChartOptions;
   chartPlugins?: PluginServiceRegistrationOptions[];
-  afterRender?: Function;
+  afterRender?: () => void;
 };
 export class LeagueCharts {
   #api: RiotApi;

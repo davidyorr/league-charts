@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 // Summoner
 // ----------------
@@ -240,7 +240,7 @@ export class RiotApi {
     });
   }
 
-  champions = () => {
+  champions = (): Promise<AxiosResponse<ChampionMap>> => {
     return this.#instance.get<ChampionMap>(
       "https://ddragon.leagueoflegends.com/cdn/10.20.1/data/en_US/champion.json",
       {
@@ -265,12 +265,12 @@ export class RiotApi {
     );
   };
 
-  championImageUrl = (imageName: string) => {
+  championImageUrl = (imageName: string): string => {
     return `https://ddragon.leagueoflegends.com/cdn/10.20.1/img/champion/${imageName}`;
   };
 
   summoner = {
-    byName: (summonerName: string) => {
+    byName: (summonerName: string): Promise<AxiosResponse<SummonerDto>> => {
       return this.#instance.get<SummonerDto>(
         `summoner/v4/summoners/by-name/${summonerName}`
       );
@@ -278,13 +278,13 @@ export class RiotApi {
   };
 
   match = {
-    byMatchId: (matchId: number) => {
+    byMatchId: (matchId: number): Promise<AxiosResponse<MatchDto>> => {
       return this.#instance.get<MatchDto>(`match/v4/matches/${matchId}`);
     },
   };
 
   matchList = {
-    byAccountId: (accountId: string) => {
+    byAccountId: (accountId: string): Promise<AxiosResponse<MatchListDto>> => {
       return this.#instance.get<MatchListDto>(
         `match/v4/matchlists/by-account/${accountId}?endIndex=1`
       );
@@ -292,7 +292,7 @@ export class RiotApi {
   };
 
   timeline = {
-    byMatchId: (matchId: number) => {
+    byMatchId: (matchId: number): Promise<AxiosResponse<MatchTimelineDto>> => {
       return this.#instance.get<MatchTimelineDto>(
         `match/v4/timelines/by-match/${matchId}?endIndex=1`
       );
