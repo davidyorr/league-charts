@@ -10,3 +10,21 @@ Generate League of Legends charts
 ## Demo
 
 Storybook: https://league-charts.vercel.app/storybook/
+
+## Example
+
+```typescript
+const leagueCharts = new LeagueCharts("riot-api-key");
+leagueCharts.barChart({
+  chartStat: "totalDamageDealtToChampions",
+  chartContext: document.getElementById("champion-damage-chart"),
+  summonerName: "the summoner name",
+  chartOptions: {
+    responsive: false,
+  },
+});
+```
+
+```html
+<canvas id="champion-damage-chart" width="600" height="500" />
+```
