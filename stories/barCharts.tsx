@@ -33,18 +33,19 @@ export const Story: {
     const leagueCharts = new LeagueCharts("api key");
     leagueCharts.barChart({
       chartStat: stat,
-      chartContext: document.getElementById("champion-damage-chart"),
+      chartContext: document.getElementById("bar-chart"),
       summonerName: "AudreyRuston",
       chartOptions: {
         responsive: false,
       },
       afterRender: () => {
         console.log("passed callback");
+        document.getElementById("bar-chart").classList.add("loaded");
       },
     });
   }, [stat]);
 
-  return <canvas id="champion-damage-chart" width="600" height="500" />;
+  return <canvas id="bar-chart" width="600" height="500" />;
 };
 
 Story.args = {

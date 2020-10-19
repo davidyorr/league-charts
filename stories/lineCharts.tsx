@@ -42,20 +42,19 @@ export const Story: {
     const leagueCharts = new LeagueCharts("api key");
     leagueCharts.lineChart({
       chartStat: stat,
-      chartContext: document.getElementById("team-gold-advantage-chart"),
+      chartContext: document.getElementById("line-chart"),
       summonerName: "AudreyRuston",
       chartOptions: {
         responsive: false,
       },
       afterRender: () => {
         console.log("passed callback");
+        document.getElementById("line-chart").classList.add("loaded");
       },
     });
   }, [stat]);
 
-  return (
-    <canvas id="team-gold-advantage-chart" width="800" height="400"></canvas>
-  );
+  return <canvas id="line-chart" width="800" height="400"></canvas>;
 };
 
 Story.args = {
