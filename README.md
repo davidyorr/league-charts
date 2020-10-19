@@ -18,7 +18,7 @@ const leagueCharts = new LeagueCharts("riot-api-key");
 leagueCharts.barChart({
   chartStat: "totalDamageDealtToChampions",
   chartContext: document.getElementById("champion-damage-chart"),
-  summonerName: "the summoner name",
+  summonerName: "AudreyRuston",
   chartOptions: {
     responsive: false,
   },
@@ -28,3 +28,24 @@ leagueCharts.barChart({
 ```html
 <canvas id="champion-damage-chart" width="600" height="500" />
 ```
+
+![bar chart screenshot](/cypress/snapshots/charts.test.ts/charts%20--%20bar%20chart%20(1).snap.png)
+
+```typescript
+const leagueCharts = new LeagueCharts("riot-api-key");
+leagueCharts.lineChart({
+  chartStat: "totalGold",
+  chartContext: document.getElementById("gold-advantage-chart"),
+  summonerName: "AudreyRuston",
+  chartOptions: {
+    responsive: false,
+  },
+});
+```
+
+```html
+<canvas id="gold-advantage-chart" width="800" height="400" />
+```
+
+![line chart screenshot](cypress/snapshots/charts.test.ts/charts%20--%20line%20chart%20(1).snap.png)
+
