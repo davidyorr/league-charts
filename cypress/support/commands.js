@@ -3,5 +3,5 @@ import { addMatchImageSnapshotCommand } from "cypress-image-snapshot/command";
 
 addMatchImageSnapshotCommand({
   // the font is causing there to be slight differences, so increase this slightly
-  failureThreshold: 1,
+  failureThreshold: 0,
 });
