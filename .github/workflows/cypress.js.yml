@@ -23,6 +23,7 @@ jobs:
           yarn cypress
       - name: Archive code coverage results
         uses: actions/upload-artifact@v2
+        if: ${{ failure() }}
         with:
           name: snapshots
           path: cypress/snapshots/
