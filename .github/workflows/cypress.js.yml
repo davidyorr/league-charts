@@ -11,10 +11,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: install, build storybook, and run cypress tests
+        uses: actions/setup-node@v1
         with:
           node-version: 12
-      - run: yarn install
-      - run: yarn storybook:build
-      - run: yarn cypress
+      - run: |
+          yarn install
+          yarn storybook:build
+          yarn cypress
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v2
+        with:
+          name: snapshots
+          path: cypress/snapshots/
