@@ -223,8 +223,9 @@ export class LeagueCharts {
     const summonerParticipantId =
       matchResponse.data.participantIdentities.find(
         (particiantIdentity) =>
-          particiantIdentity.player.summonerName.toLowerCase() ===
-          summonerName.toLowerCase()
+          particiantIdentity.player.summonerName
+            .toLowerCase()
+            .replace(/ /g, "") === summonerName.toLowerCase().replace(/ /g, "")
       )?.participantId ?? 1;
 
     // as in the top part of the chart, the positive numbers, the blue
