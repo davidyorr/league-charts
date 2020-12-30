@@ -81,7 +81,7 @@ export class LeagueCharts {
   }): Promise<Chart> {
     await this.#championsPromise;
     const matchResponse = await this.getLastMatchResponse(summonerName);
-    const icons = this.#champions
+    const iconPromises = this.#champions
       ? matchResponse.data.participantIdentities.map((_, index) => {
           const imageName = (this.#champions as ChampionMap)[
             matchResponse.data.participants[index].championId
@@ -146,6 +146,7 @@ export class LeagueCharts {
     };
 
     const imagePromises: Array<Promise<any>> = [];
+    const icons = await Promise.all(iconPromises);
 
     const plugins: PluginServiceRegistrationOptions[] = [
       {
