@@ -16,8 +16,8 @@ import {
   Scriptable,
 } from "chart.js";
 
+import { Image, loadImage } from "canvas";
 import { Colors } from "./colors";
-import { loadImage } from "canvas";
 
 type FunctionParams = {
   chartContext: any;
@@ -30,6 +30,9 @@ export class LeagueCharts {
   #api: RiotApi;
   #latestDataDragonVersion: string | undefined;
   #champions?: ChampionMap | undefined;
+  #championImageSpriteSheets: {
+    [id: string]: Image;
+  } = {};
 
   constructor(apiKey: string) {
     this.#api = new RiotApi(apiKey);
@@ -78,19 +81,12 @@ export class LeagueCharts {
         this.#champions = (await this.#api.champions(dataDragonVersion)).data;
       } catch (err) {
         console.log("error fetching champion.json", err);
+        throw err;
       }
     }
 
     this.#latestDataDragonVersion = dataDragonVersion;
 
-    const iconPromises = this.#champions
-      ? matchResponse.data.participantIdentities.map((_, index) => {
-          const imageName = (this.#champions as ChampionMap)[
-            matchResponse.data.participants[index].championId
-          ].image.full;
-          return this.#api.championImageUrl(dataDragonVersion, imageName);
-        })
-      : [];
     let max = 0;
 
     const data: ChartData = {
@@ -147,37 +143,62 @@ export class LeagueCharts {
       },
     };
 
-    const imagePromises: Array<Promise<any>> = [];
-    const icons = await Promise.all(iconPromises);
-
     const plugins: PluginServiceRegistrationOptions[] = [
       {
-        afterRender: (chart) => {
-          if (icons.length > 0) {
-            const IMAGE_SIZE = 24;
+        afterRender: async (chart) => {
+          const championImagePromises: Array<Promise<any>> = [];
 
-            const yAxis = (chart as any).scales["y-axis-0"];
-            yAxis.ticks.forEach((_: any, index: number) => {
-              const y = yAxis.getPixelForTick(index);
+          await Promise.all(
+            matchResponse.data.participants.map(async (participant) => {
+              if (this.#champions) {
+                const spriteId = this.#champions[participant.championId].image
+                  .sprite;
+                const url = await this.#api.championImageSpriteSheetUrl(
+                  dataDragonVersion,
+                  spriteId
+                );
 
-              imagePromises.push(
-                loadImage(icons[index]).then((image) => {
-                  chart.ctx?.drawImage(
-                    image as any,
-                    yAxis.right - IMAGE_SIZE - IMAGE_SIZE / 2,
-                    y - IMAGE_SIZE / 2,
-                    IMAGE_SIZE,
-                    IMAGE_SIZE
+                if (!this.#championImageSpriteSheets[spriteId]) {
+                  championImagePromises.push(
+                    loadImage(url).then((image) => {
+                      this.#championImageSpriteSheets[spriteId] = image;
+                    })
                   );
-                })
-              );
-            });
-
-            Promise.all(imagePromises).then(() => {
-              if (afterRender) {
-                afterRender();
+                }
               }
-            });
+            })
+          );
+          await Promise.all(championImagePromises);
+
+          const IMAGE_SIZE = 24;
+
+          const yAxis = (chart as any).scales["y-axis-0"];
+          yAxis.ticks.forEach((_: any, index: number) => {
+            const y = yAxis.getPixelForTick(index);
+
+            if (this.#champions) {
+              const imageDto = this.#champions[
+                matchResponse.data.participants[index].championId
+              ].image;
+              const image = this.#championImageSpriteSheets[imageDto.sprite];
+              if (image) {
+                chart.ctx?.drawImage(
+                  image as any,
+                  imageDto.x,
+                  imageDto.y,
+                  imageDto.w,
+                  imageDto.h,
+                  yAxis.right - IMAGE_SIZE - IMAGE_SIZE / 2,
+                  y - IMAGE_SIZE / 2,
+                  IMAGE_SIZE,
+                  IMAGE_SIZE
+                );
+              }
+            }
+          });
+
+          if (afterRender) {
+            afterRender();
           }
         },
       },

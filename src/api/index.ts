@@ -287,6 +287,13 @@ export class RiotApi {
     );
   };
 
+  championImageSpriteSheetUrl = async (
+    dataDragonVersion: string,
+    id: string
+  ): Promise<string> => {
+    return `https://ddragon.leagueoflegends.com/cdn/${dataDragonVersion}/img/sprite/${id}`;
+  };
+
   championImageUrl = async (
     dataDragonVersion: string,
     imageName: string
