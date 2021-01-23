@@ -28,23 +28,14 @@ type FunctionParams = {
 };
 export class LeagueCharts {
   #api: RiotApi;
-  #championsPromise: Promise<void>;
-  #champions?: ChampionMap;
+  #latestDataDragonVersion: string | undefined;
+  #champions?: ChampionMap | undefined;
 
   constructor(apiKey: string) {
     this.#api = new RiotApi(apiKey);
 
     Chart.defaults.global.defaultFontColor = Colors.text;
     Chart.defaults.global.defaultFontStyle = "normal";
-
-    this.#championsPromise = this.#api
-      .champions()
-      .then((championResponse) => {
-        this.#champions = championResponse.data;
-      })
-      .catch((err) => {
-        console.log("error fetching champion.json", err);
-      });
   }
 
   private async getLastMatchResponse(summonerName: string) {
@@ -79,14 +70,25 @@ export class LeagueCharts {
   }: FunctionParams & {
     chartStat: keyof ParticipantStatsDto;
   }): Promise<Chart> {
-    await this.#championsPromise;
     const matchResponse = await this.getLastMatchResponse(summonerName);
+    const dataDragonVersion = await this.#api.dataDragonVersion();
+
+    if (this.#latestDataDragonVersion !== dataDragonVersion) {
+      try {
+        this.#champions = (await this.#api.champions(dataDragonVersion)).data;
+      } catch (err) {
+        console.log("error fetching champion.json", err);
+      }
+    }
+
+    this.#latestDataDragonVersion = dataDragonVersion;
+
     const iconPromises = this.#champions
       ? matchResponse.data.participantIdentities.map((_, index) => {
           const imageName = (this.#champions as ChampionMap)[
             matchResponse.data.participants[index].championId
           ].image.full;
-          return this.#api.championImageUrl(imageName);
+          return this.#api.championImageUrl(dataDragonVersion, imageName);
         })
       : [];
     let max = 0;

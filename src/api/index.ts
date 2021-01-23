@@ -230,8 +230,6 @@ const X_RIOT_TOKEN_HEADER = "X-Riot-Token";
 
 export class RiotApi {
   #instance: AxiosInstance;
-  #dataDragonVersion?: string;
-  #dataDragonVersionPromise: Promise<void>;
 
   constructor(apiKey: string) {
     this.#instance = axios.create({
@@ -240,24 +238,33 @@ export class RiotApi {
         [X_RIOT_TOKEN_HEADER]: apiKey,
       },
     });
-    this.#dataDragonVersionPromise = this.#instance
-      .get<string[]>("https://ddragon.leagueoflegends.com/api/versions.json")
-      .then((versionsResponse) => {
-        this.#dataDragonVersion = versionsResponse.data[0];
-      })
-      .catch((err) => {
-        console.log("error fetching data dragon versions", err);
-        this.#dataDragonVersion = "10.25.1";
-      });
   }
 
-  champions = async (): Promise<AxiosResponse<ChampionMap>> => {
-    await this.#dataDragonVersionPromise;
+  dataDragonVersion = async (): Promise<string> => {
+    let dataDragonVersion = "11.2.1";
 
+    try {
+      const versionsResponse = await this.#instance.get<string[]>(
+        "https://ddragon.leagueoflegends.com/api/versions.json",
+        {
+          transformRequest: (_, headers) => {
+            delete headers[X_RIOT_TOKEN_HEADER];
+          },
+        }
+      );
+      dataDragonVersion = versionsResponse.data[0];
+    } catch (err) {
+      console.log("error fetching data dragon versions", err);
+    }
+
+    return dataDragonVersion;
+  };
+
+  champions = async (
+    dataDragonVersion: string
+  ): Promise<AxiosResponse<ChampionMap>> => {
     return this.#instance.get<ChampionMap>(
-      `https://ddragon.leagueoflegends.com/cdn/${
-        this.#dataDragonVersion
-      }/data/en_US/champion.json`,
+      `https://ddragon.leagueoflegends.com/cdn/${dataDragonVersion}/data/en_US/champion.json`,
       {
         transformRequest: (_, headers) => {
           delete headers[X_RIOT_TOKEN_HEADER];
@@ -280,12 +287,11 @@ export class RiotApi {
     );
   };
 
-  championImageUrl = async (imageName: string): Promise<string> => {
-    await this.#dataDragonVersionPromise;
-
-    return `https://ddragon.leagueoflegends.com/cdn/${
-      this.#dataDragonVersion
-    }/img/champion/${imageName}`;
+  championImageUrl = async (
+    dataDragonVersion: string,
+    imageName: string
+  ): Promise<string> => {
+    return `https://ddragon.leagueoflegends.com/cdn/${dataDragonVersion}/img/champion/${imageName}`;
   };
 
   summoner = {
