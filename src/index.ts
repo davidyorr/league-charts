@@ -1,8 +1,12 @@
 import {
+  Api,
   ChampionMap,
+  ItemJson,
+  MatchDto,
   MatchParticipantFrameDto,
   ParticipantStatsDto,
-  RiotApi,
+  RuneMap,
+  SummonerSpellJson,
 } from "./api";
 
 import {
@@ -16,29 +20,63 @@ import {
   Scriptable,
 } from "chart.js";
 
-import { Image, loadImage } from "canvas";
+import { Image, loadImage, registerFont } from "canvas";
+import { AxiosResponse } from "axios";
 import { Colors } from "./colors";
+import commaNumber from "comma-number";
+
+type SpriteSheet = {
+  [id: string]: Image;
+};
 
 type FunctionParams = {
   chartContext: any;
   summonerName: string;
+  region?:
+    | "BR1"
+    | "EUN1"
+    | "EUW1"
+    | "JP1"
+    | "KR"
+    | "LA1"
+    | "LA2"
+    | "NA1"
+    | "OC1"
+    | "RU"
+    | "TR1";
   chartOptions?: ChartOptions;
   chartPlugins?: PluginServiceRegistrationOptions[];
   afterRender?: () => void;
 };
 export class LeagueCharts {
-  #api: RiotApi;
-  #latestDataDragonVersion: string | undefined;
-  #champions?: ChampionMap | undefined;
-  #championImageSpriteSheets: {
-    [id: string]: Image;
-  } = {};
+  #api: Api;
+  // the last data dragon version used, not the most recent version available
+  #lastDataDragonVersion: string | undefined;
+  // cache of the champions fetched from data dragon
+  #champions: ChampionMap | undefined;
+  // cache of the items fetched from data dragon
+  #items: ItemJson | undefined;
+  // cache of the summoner spells fetched from data dragon
+  #summonerSpells: SummonerSpellJson | undefined;
+  // cache of the runes fetched from data dragon
+  #runes: RuneMap | undefined;
 
   constructor(apiKey: string) {
-    this.#api = new RiotApi(apiKey);
+    this.#api = new Api(apiKey);
 
-    Chart.defaults.global.defaultFontColor = Colors.text;
+    Chart.defaults.global.defaultFontColor = Colors.primaryText;
     Chart.defaults.global.defaultFontStyle = "normal";
+    Chart.defaults.global.defaultFontFamily = "Rubik";
+
+    // load the fonts if we're in a node environment
+    if (registerFont !== undefined) {
+      registerFont(`${__dirname}/assets/RubikLightRegular.ttf`, {
+        family: "Rubik",
+      });
+      registerFont(`${__dirname}/assets/KarlaBold.ttf`, {
+        family: "Karla",
+      });
+    }
   }
 
   private async getLastMatchResponse(summonerName: string) {
@@ -63,9 +101,413 @@ export class LeagueCharts {
       .replace(/^./g, (str) => str.toUpperCase());
   }
 
+  private addGradientBackground(chartContext: any): void {
+    const ctx = chartContext.getContext("2d");
+    const width = chartContext.width;
+    const height = chartContext.height;
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, Colors.gradient1);
+    gradient.addColorStop(0.5, Colors.gradient2);
+    gradient.addColorStop(1, Colors.gradient1);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  // load fonts if the current environment is a browser
+  private async loadFonts(): Promise<void> {
+    async function loadFont(fontFace: FontFace): Promise<void> {
+      try {
+        fontFace = await fontFace.load();
+        document.fonts.add(fontFace);
+      } catch (err) {
+        console.log("error loading font", err);
+      }
+    }
+
+    if (registerFont === undefined && FontFace !== undefined) {
+      await loadFont(
+        new FontFace(
+          "Rubik",
+          `url(${require("./assets/RubikLightRegular.ttf")})`
+        )
+      );
+      await loadFont(
+        new FontFace("Karla", `url(${require("./assets/KarlaBold.ttf")})`)
+      );
+    }
+  }
+
+  private async imageSpriteSheet(
+    matchResponse: AxiosResponse<MatchDto>,
+    populateSpriteSheet: (
+      imageSpriteSheet: SpriteSheet,
+      participant: MatchDto["participants"][0]
+    ) => Promise<void>
+  ): Promise<SpriteSheet> {
+    const imageSpriteSheet: SpriteSheet = {};
+
+    for (const participant of matchResponse.data.participants) {
+      await populateSpriteSheet(imageSpriteSheet, participant);
+    }
+
+    return imageSpriteSheet;
+  }
+
+  private async championImageSpriteSheets(
+    matchResponse: AxiosResponse<MatchDto>,
+    dataDragonVersion: string
+  ): Promise<SpriteSheet> {
+    return this.imageSpriteSheet(
+      matchResponse,
+      async (championImageSpriteSheets, participant) => {
+        if (this.#champions) {
+          const spriteId = this.#champions[participant.championId].image.sprite;
+          const url = this.#api.championImageSpriteSheetUrl(
+            dataDragonVersion,
+            spriteId
+          );
+
+          if (!championImageSpriteSheets[spriteId]) {
+            championImageSpriteSheets[spriteId] = await loadImage(url);
+          }
+        }
+      }
+    );
+  }
+
+  async scoreboard({
+    chartContext,
+    summonerName,
+    region,
+    afterRender,
+  }: Pick<
+    FunctionParams,
+    "chartContext" | "summonerName" | "region" | "afterRender"
+  >): Promise<Chart> {
+    if (region) {
+      this.#api.setRegion(region);
+    }
+
+    const matchResponse = await this.getLastMatchResponse(summonerName);
+
+    // get the data dragon version
+    const dataDragonVersion = await this.#api.dataDragonVersion(
+      matchResponse.data.gameVersion
+    );
+
+    if (this.#lastDataDragonVersion !== dataDragonVersion) {
+      try {
+        this.#champions = (await this.#api.champions(dataDragonVersion)).data;
+        this.#items = (await this.#api.items(dataDragonVersion)).data;
+        this.#summonerSpells = (
+          await this.#api.summonerSpells(dataDragonVersion)
+        ).data;
+        this.#runes = (await this.#api.runes(dataDragonVersion)).data;
+      } catch (err) {
+        console.log("error fetching data dragon json files", err);
+        throw err;
+      }
+    }
+
+    this.#lastDataDragonVersion = dataDragonVersion;
+
+    // load sprite sheets for the champion images
+    const championImageSpriteSheets = await this.championImageSpriteSheets(
+      matchResponse,
+      dataDragonVersion
+    );
+
+    // load sprite sheets for the item images
+    const itemImageSpriteSheets = await this.imageSpriteSheet(
+      matchResponse,
+      async (itemImageSpriteSheets, participant) => {
+        if (this.#items) {
+          for (let j = 0; j <= 6; j++) {
+            const itemId = participant.stats[`item${j}` as "item0"];
+
+            if (itemId) {
+              const spriteId = this.#items.data[itemId].image.sprite;
+              const url = this.#api.itemSpriteSheetUrl(
+                dataDragonVersion,
+                spriteId
+              );
+
+              if (!itemImageSpriteSheets[spriteId]) {
+                itemImageSpriteSheets[spriteId] = await loadImage(url);
+              }
+            }
+          }
+        }
+      }
+    );
+
+    // load sprite sheets for the summoner spell images
+    const summonerSpellSpriteSheets = await this.imageSpriteSheet(
+      matchResponse,
+      async (summonerSpellSpriteSheets, participant) => {
+        if (this.#summonerSpells) {
+          for (let j = 1; j <= 2; j++) {
+            const spellId = participant[`spell${j}Id` as "spell1Id"];
+
+            if (spellId) {
+              const spriteId = this.#summonerSpells.data[spellId].image.sprite;
+              const url = this.#api.summonerSpellSpriteSheetUrl(
+                dataDragonVersion,
+                spriteId
+              );
+
+              if (!summonerSpellSpriteSheets[spriteId]) {
+                summonerSpellSpriteSheets[spriteId] = await loadImage(url);
+              }
+            }
+          }
+        }
+      }
+    );
+
+    // load the rune images
+    const runeImages = await this.imageSpriteSheet(
+      matchResponse,
+      async (runeImages, participant) => {
+        if (this.#runes) {
+          const runeId = participant.stats.perk0;
+          const runePath = this.#runes[runeId].icon;
+          const url = this.#api.runeImageUrl(runePath);
+
+          if (!runeImages[runeId]) {
+            runeImages[runeId] = await loadImage(url);
+          }
+        }
+      }
+    );
+
+    const ctx = chartContext.getContext("2d");
+
+    // load the fonts
+    await this.loadFonts();
+
+    // draw a gradient background
+    this.addGradientBackground(chartContext);
+
+    const yStart = 65;
+    const xRune = 20;
+    const xSummonerSpell = 45;
+    const xChampionLevel = 68;
+    const xChampionIcon = 90;
+    const xSummonerName = 129;
+    const xItem = 275;
+    const xKda = 475;
+    const xCsScore = 640;
+    const xGold = 725;
+
+    const rowHeight = 34;
+    const runeSize = 22;
+    const championIconSize = rowHeight - 4;
+    const itemSize = rowHeight - 10;
+    const summonerSpellSize = 14;
+    const middleGap = 45;
+
+    matchResponse.data.participantIdentities.forEach(
+      (participantIdentity, i) => {
+        const y = yStart + rowHeight * i + (i > 4 ? middleGap : 0);
+
+        // draw the primary keystone (rune)
+        const runeId = matchResponse.data.participants[i].stats.perk0;
+        const image = runeImages[runeId];
+        if (image) {
+          ctx.drawImage(image, xRune, y - rowHeight / 2, runeSize, runeSize);
+        }
+
+        // draw the summoner spells
+        for (let j = 1; j <= 2; j++) {
+          const summonerSpellId =
+            matchResponse.data.participants[i][`spell${j}Id` as "spell1Id"];
+
+          // draw the yellow border around the summoner spell
+          ctx.strokeColor = Colors.iconBorder;
+          ctx.lineWidth = 0.25;
+          ctx.strokeRect(
+            xSummonerSpell,
+            y - rowHeight + 1 + summonerSpellSize * j,
+            summonerSpellSize,
+            summonerSpellSize
+          );
+
+          // draw the summoner spell
+          if (this.#summonerSpells) {
+            const summonerSpell = this.#summonerSpells.data[summonerSpellId];
+            const image = summonerSpellSpriteSheets[summonerSpell.image.sprite];
+            if (image) {
+              ctx.drawImage(
+                image,
+                summonerSpell.image.x,
+                summonerSpell.image.y,
+                summonerSpell.image.w,
+                summonerSpell.image.h,
+                xSummonerSpell,
+                y - rowHeight + 1 + summonerSpellSize * j,
+                summonerSpellSize,
+                summonerSpellSize
+              );
+            }
+          }
+        }
+
+        // draw the champion level
+        ctx.font = "14px Karla, sans-serif";
+        ctx.fillStyle = Colors.primaryText;
+        ctx.fillText(
+          matchResponse.data.participants[i].stats.champLevel,
+          xChampionLevel,
+          y
+        );
+
+        // draw the champion images
+        if (this.#champions) {
+          const imageDto = this.#champions[
+            matchResponse.data.participants[i].championId
+          ].image;
+          const image = championImageSpriteSheets[imageDto.sprite];
+          if (image) {
+            ctx?.drawImage(
+              image as any,
+              imageDto.x,
+              imageDto.y,
+              imageDto.w,
+              imageDto.h,
+              xChampionIcon,
+              y - rowHeight / 2 - 3,
+              championIconSize,
+              championIconSize
+            );
+          }
+        }
+
+        // draw the summoner name
+        ctx.font = "12px Rubik, sans-serif";
+        ctx.fillStyle = Colors.secondaryText;
+        ctx.fillText(participantIdentity.player.summonerName, xSummonerName, y);
+
+        // draw the items
+        for (let j = 0; j <= 6; j++) {
+          const itemId =
+            matchResponse.data.participants[i].stats[`item${j}` as "item0"];
+
+          // draw the yellow border around the item
+          ctx.strokeStyle = Colors.iconBorder;
+          ctx.lineWidth = 0.25;
+          ctx.strokeRect(
+            xItem + j * itemSize,
+            y - itemSize / 2 - 3,
+            itemSize,
+            itemSize
+          );
+
+          // draw the item
+          if (itemId && this.#items) {
+            const item = this.#items.data[itemId];
+            const image = itemImageSpriteSheets[item.image.sprite];
+            if (image) {
+              ctx.drawImage(
+                image,
+                item.image.x,
+                item.image.y,
+                item.image.w,
+                item.image.h,
+                xItem + j * itemSize,
+                y - itemSize / 2 - 3,
+                itemSize,
+                itemSize
+              );
+            }
+          }
+        }
+      }
+    );
+
+    let team1Kills = 0;
+    let team1Deaths = 0;
+    let team1Assists = 0;
+    let team2Kills = 0;
+    let team2Deaths = 0;
+    let team2Assists = 0;
+    let team1Gold = 0;
+    let team2Gold = 0;
+
+    ctx.font = "12px Rubik, sans-serif";
+    ctx.fillStyle = Colors.primaryText;
+
+    matchResponse.data.participants.forEach((participant, i) => {
+      const y = yStart + rowHeight * i + (i > 4 ? 40 : 0);
+
+      ctx.fillText(participant.stats.kills, xKda, y);
+      ctx.fillText("/", xKda + 25, y);
+      ctx.fillText(participant.stats.deaths, xKda + 45, y);
+      ctx.fillText("/", xKda + 69, y);
+      ctx.fillText(participant.stats.assists, xKda + 89, y);
+      ctx.fillText(
+        participant.stats.totalMinionsKilled +
+          participant.stats.neutralMinionsKilled,
+        xCsScore,
+        y
+      );
+      ctx.fillText(commaNumber(participant.stats.goldEarned), xGold, y);
+
+      if (i < 5) {
+        team1Kills += participant.stats.kills;
+        team1Deaths += participant.stats.deaths;
+        team1Assists += participant.stats.assists;
+        team1Gold += participant.stats.goldEarned;
+      } else {
+        team2Kills += participant.stats.kills;
+        team2Deaths += participant.stats.deaths;
+        team2Assists += participant.stats.assists;
+        team2Gold += participant.stats.goldEarned;
+      }
+    });
+
+    const yTeam1 = 30;
+    const yTeam2 = 242;
+    const xTeamNumber = 20;
+    const xTeamKills = 135;
+    const xSlash1 = 165;
+    const xTeamDeaths = 185;
+    const xSlash2 = 215;
+    const xTeamAssists = 235;
+    const xTeamGold = 335;
+
+    ctx.fillStyle = Colors.blue;
+    ctx.font = "15px Karla, sans-serif";
+    ctx.fillText("TEAM 1", xTeamNumber, yTeam1);
+    ctx.fillText(team1Kills, xTeamKills, yTeam1);
+    ctx.fillText("/", xSlash1, yTeam1);
+    ctx.fillText(team1Deaths, xTeamDeaths, yTeam1);
+    ctx.fillText("/", xSlash2, yTeam1);
+    ctx.fillText(team1Assists, xTeamAssists, yTeam1);
+    ctx.fillStyle = Colors.secondaryText;
+    ctx.fillText(commaNumber(team1Gold), xTeamGold, yTeam1);
+
+    ctx.fillStyle = Colors.red;
+    ctx.fillText("TEAM 2", xTeamNumber, yTeam2);
+    ctx.fillText(team2Kills, xTeamKills, yTeam2);
+    ctx.fillText("/", xSlash1, yTeam2);
+    ctx.fillText(team2Deaths, xTeamDeaths, yTeam2);
+    ctx.fillText("/", xSlash2, yTeam2);
+    ctx.fillText(team2Assists, xTeamAssists, yTeam2);
+    ctx.fillStyle = Colors.secondaryText;
+    ctx.fillText(commaNumber(team2Gold), xTeamGold, yTeam2);
+
+    if (afterRender) {
+      afterRender();
+    }
+
+    return chartContext;
+  }
+
   async barChart({
     chartContext,
     summonerName,
+    region,
     chartOptions,
     chartPlugins,
     afterRender,
@@ -73,10 +515,16 @@ export class LeagueCharts {
   }: FunctionParams & {
     chartStat: keyof ParticipantStatsDto;
   }): Promise<Chart> {
-    const matchResponse = await this.getLastMatchResponse(summonerName);
-    const dataDragonVersion = await this.#api.dataDragonVersion();
+    if (region) {
+      this.#api.setRegion(region);
+    }
 
-    if (this.#latestDataDragonVersion !== dataDragonVersion) {
+    const matchResponse = await this.getLastMatchResponse(summonerName);
+    const dataDragonVersion = await this.#api.dataDragonVersion(
+      matchResponse.data.gameVersion
+    );
+
+    if (this.#lastDataDragonVersion !== dataDragonVersion) {
       try {
         this.#champions = (await this.#api.champions(dataDragonVersion)).data;
       } catch (err) {
@@ -85,7 +533,7 @@ export class LeagueCharts {
       }
     }
 
-    this.#latestDataDragonVersion = dataDragonVersion;
+    this.#lastDataDragonVersion = dataDragonVersion;
 
     let max = 0;
 
@@ -93,11 +541,13 @@ export class LeagueCharts {
       datasets: [
         {
           data: matchResponse.data.participants.map((participant) => {
+            // maybe only allow chartStat to be a type that makes value a number
+            // or make an explicit list of certain properties instead of any stat
             const value = participant.stats[chartStat];
-            if (value > max) {
+            if (value !== undefined && value > max) {
               max = value;
             }
-            return value;
+            return value ?? 0;
           }),
           backgroundColor: (({ dataIndex = 0 }) =>
             dataIndex < 5 ? Colors.lightBlue : Colors.lightRed) as Scriptable<
@@ -116,6 +566,14 @@ export class LeagueCharts {
 
     const options: ChartOptions = {
       events: [],
+      layout: {
+        padding: {
+          top: 12,
+          right: 36,
+          bottom: 12,
+          left: 24,
+        },
+      },
       legend: {
         display: false,
       },
@@ -146,29 +604,10 @@ export class LeagueCharts {
     const plugins: PluginServiceRegistrationOptions[] = [
       {
         afterRender: async (chart) => {
-          const championImagePromises: Array<Promise<any>> = [];
-
-          await Promise.all(
-            matchResponse.data.participants.map(async (participant) => {
-              if (this.#champions) {
-                const spriteId = this.#champions[participant.championId].image
-                  .sprite;
-                const url = await this.#api.championImageSpriteSheetUrl(
-                  dataDragonVersion,
-                  spriteId
-                );
-
-                if (!this.#championImageSpriteSheets[spriteId]) {
-                  championImagePromises.push(
-                    loadImage(url).then((image) => {
-                      this.#championImageSpriteSheets[spriteId] = image;
-                    })
-                  );
-                }
-              }
-            })
+          const championImageSpriteSheets = await this.championImageSpriteSheets(
+            matchResponse,
+            dataDragonVersion
           );
-          await Promise.all(championImagePromises);
 
           const IMAGE_SIZE = 24;
 
@@ -180,7 +619,7 @@ export class LeagueCharts {
               const imageDto = this.#champions[
                 matchResponse.data.participants[index].championId
               ].image;
-              const image = this.#championImageSpriteSheets[imageDto.sprite];
+              const image = championImageSpriteSheets[imageDto.sprite];
               if (image) {
                 chart.ctx?.drawImage(
                   image as any,
@@ -201,6 +640,10 @@ export class LeagueCharts {
             afterRender();
           }
         },
+        beforeDraw: async () => {
+          this.addGradientBackground(chartContext);
+          await this.loadFonts();
+        },
       },
     ];
 
@@ -220,6 +663,7 @@ export class LeagueCharts {
   async lineChart({
     chartContext,
     summonerName,
+    region,
     chartOptions,
     chartPlugins,
     afterRender,
@@ -230,6 +674,10 @@ export class LeagueCharts {
       "participantId" | "position"
     >;
   }): Promise<Chart> {
+    if (region) {
+      this.#api.setRegion(region);
+    }
+
     const matchResponse = await this.getLastMatchResponse(summonerName);
     let timelineResponse;
     try {
@@ -289,7 +737,7 @@ export class LeagueCharts {
     });
 
     if (max >= 1000) {
-      max = Math.round(max / 1000) * 1000;
+      max = Math.ceil(max / 1000) * 1000;
     }
 
     const data: ChartData = {
@@ -304,6 +752,14 @@ export class LeagueCharts {
     const options: ChartOptions = {
       legend: {
         display: false,
+      },
+      layout: {
+        padding: {
+          top: 6,
+          right: 12,
+          bottom: 6,
+          left: 12,
+        },
       },
       title: {
         display: true,
@@ -387,6 +843,10 @@ export class LeagueCharts {
               }
             }
           }
+        },
+        beforeDraw: async () => {
+          this.addGradientBackground(chartContext);
+          await this.loadFonts();
         },
       },
     ];

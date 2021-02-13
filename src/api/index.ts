@@ -16,7 +16,7 @@ type SummonerDto = {
 // Match
 // ----------------
 
-type MatchDto = {
+export type MatchDto = {
   gameId: number;
   participantIdentities: ParticipantIdentityDto[];
   queueId: number;
@@ -51,17 +51,22 @@ type PlayerDto = {
 type ParticipantDto = {
   participantId: number;
   championId: number;
-  runes: any[];
   stats: ParticipantStatsDto;
   teamId: number;
   timeline: any;
   spell1Id: number;
   spell2Id: number;
   highestAchievedSeasonTier: string;
-  masteries: any[];
 };
 
 export type ParticipantStatsDto = {
+  item0?: number;
+  item1?: number;
+  item2?: number;
+  item3?: number;
+  item4?: number;
+  item5?: number;
+  item6?: number;
   totalUnitsHealed: number;
   largestMultiKill: number;
   goldEarned: number;
@@ -88,7 +93,10 @@ export type ParticipantStatsDto = {
   physicalDamageDealtToChampions: number;
   neutralMinionsKilledTeamJungle: number;
   totalMinionsKilled: number;
+  kills: number;
+  assists: number;
   visionScore: number;
+  perk0: number; // rune
 };
 
 // Match List
@@ -185,7 +193,7 @@ type MatchEventDto = {
   victimId: number;
 };
 
-// Data Dragon champion.json
+// Data Dragon
 // ----------------
 
 type ChampionJson = {
@@ -226,49 +234,152 @@ export type ChampionMap = {
   [index: string]: ChampionDto;
 };
 
+export type ItemJson = {
+  type: string;
+  version: string;
+  basic: any;
+  data: {
+    [id: number]: ItemDto;
+  };
+  groups: any[];
+  tree: any[];
+};
+
+type ItemDto = {
+  name: string;
+  description: string;
+  colloq: string; // ;
+  plaintext: string;
+  stacks: number;
+  consumed: boolean;
+  inStore: boolean;
+  hideFromAll: boolean;
+  image: {
+    full: string;
+    sprite: string;
+    group: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+  gold: {
+    base: number;
+    purchasable: boolean;
+    sell: number;
+    total: number;
+  };
+  tags: string[];
+  maps: string;
+  stats: Record<string, unknown>;
+  effect: {
+    Effect1Amount: string;
+  };
+};
+
+export type SummonerSpellJson = {
+  type: string;
+  version: string;
+  data: {
+    [id: string]: SummonerSpellDto;
+  };
+};
+
+type SummonerSpellDto = {
+  id: string;
+  name: string;
+  description: string;
+  tooltip: string;
+  maxrank: number;
+  key: string;
+  image: {
+    full: string;
+    sprite: string;
+    group: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+};
+
+type RuneResponse = Array<{
+  // this is the tree (Domination, Inspiration, Precision, Resolve, Sorcery)
+  // and the individual runes are in the "slots" property
+  id: number;
+  key: string; // name without spaces
+  icon: string;
+  // slots are basically the rows, and runes are the columns
+  slots: Array<{
+    runes: Array<RuneDto>;
+  }>;
+}>;
+
+type RuneDto = {
+  id: number;
+  key: string;
+  icon: string;
+};
+
+export type RuneMap = {
+  [id: number]: RuneDto;
+};
+
 const X_RIOT_TOKEN_HEADER = "X-Riot-Token";
 
-export class RiotApi {
-  #instance: AxiosInstance;
+export class Api {
+  #riotInstance: AxiosInstance;
+  #dataDragonInstance: AxiosInstance;
 
   constructor(apiKey: string) {
-    this.#instance = axios.create({
+    this.#riotInstance = axios.create({
       baseURL: "https://na1.api.riotgames.com/lol/",
       headers: {
         [X_RIOT_TOKEN_HEADER]: apiKey,
       },
     });
+    this.#dataDragonInstance = axios.create({
+      baseURL: "https://ddragon.leagueoflegends.com/",
+    });
   }
 
-  dataDragonVersion = async (): Promise<string> => {
-    let dataDragonVersion = "11.2.1";
-
-    try {
-      const versionsResponse = await this.#instance.get<string[]>(
-        "https://ddragon.leagueoflegends.com/api/versions.json",
-        {
-          transformRequest: (_, headers) => {
-            delete headers[X_RIOT_TOKEN_HEADER];
-          },
-        }
-      );
-      dataDragonVersion = versionsResponse.data[0];
-    } catch (err) {
-      console.log("error fetching data dragon versions", err);
-    }
-
-    return dataDragonVersion;
+  setRegion = (region: string): void => {
+    this.#riotInstance.defaults.baseURL = `https://${region.toLowerCase()}.api.riotgames.com/lol/`;
   };
 
-  champions = async (
+  dataDragonVersion = async (gameVersion: string): Promise<string> => {
+    try {
+      const versionsResponse = await this.#dataDragonInstance.get<string[]>(
+        "api/versions.json"
+      );
+
+      const [major, minor] = gameVersion.split(".");
+
+      const version = versionsResponse.data.find((version) => {
+        const [bMajor, bMinor] = version.split(".");
+
+        return major === bMajor && minor === bMinor;
+      });
+
+      if (version === undefined) {
+        throw new Error(
+          `error finding data dragon version for game version ${major}.${minor}`
+        );
+      }
+
+      return version;
+    } catch (err) {
+      console.log("error fetching data dragon versions", err);
+      throw err;
+    }
+  };
+
+  champions = (
     dataDragonVersion: string
   ): Promise<AxiosResponse<ChampionMap>> => {
-    return this.#instance.get<ChampionMap>(
-      `https://ddragon.leagueoflegends.com/cdn/${dataDragonVersion}/data/en_US/champion.json`,
+    return this.#dataDragonInstance.get<ChampionMap>(
+      `cdn/${dataDragonVersion}/data/en_US/champion.json`,
       {
-        transformRequest: (_, headers) => {
-          delete headers[X_RIOT_TOKEN_HEADER];
-        },
         transformResponse: (data: string | undefined) => {
           if (data) {
             const championJson: ChampionJson = JSON.parse(data);
@@ -287,37 +398,127 @@ export class RiotApi {
     );
   };
 
-  championImageSpriteSheetUrl = async (
+  championImageSpriteSheetUrl = (
     dataDragonVersion: string,
     id: string
-  ): Promise<string> => {
-    return `https://ddragon.leagueoflegends.com/cdn/${dataDragonVersion}/img/sprite/${id}`;
+  ): string => {
+    return `${
+      this.#dataDragonInstance.defaults.baseURL
+    }cdn/${dataDragonVersion}/img/sprite/${id}`;
   };
 
-  championImageUrl = async (
+  championImageUrl = (dataDragonVersion: string, imageName: string): string => {
+    return `${
+      this.#dataDragonInstance.defaults.baseURL
+    }cdn/${dataDragonVersion}/img/champion/${imageName}`;
+  };
+
+  items = (dataDragonVersion: string): Promise<AxiosResponse<ItemJson>> => {
+    return this.#dataDragonInstance.get<ItemJson>(
+      `cdn/${dataDragonVersion}/data/en_US/item.json`,
+      {
+        transformResponse: (data: string | undefined) => {
+          if (data) {
+            const itemJson: ItemJson = JSON.parse(data);
+
+            return itemJson;
+          }
+
+          return data;
+        },
+      }
+    );
+  };
+
+  itemSpriteSheetUrl = (dataDragonVersion: string, id: string): string => {
+    return `${
+      this.#dataDragonInstance.defaults.baseURL
+    }cdn/${dataDragonVersion}/img/sprite/${id}`;
+  };
+
+  summonerSpells = (
+    dataDragonVersion: string
+  ): Promise<AxiosResponse<SummonerSpellJson>> => {
+    return this.#dataDragonInstance.get<SummonerSpellJson>(
+      `cdn/${dataDragonVersion}/data/en_US/summoner.json`,
+      {
+        transformResponse: (data: string | undefined) => {
+          if (data) {
+            const summonerSpellJson: SummonerSpellJson = JSON.parse(data);
+            const remappedData: SummonerSpellJson["data"] = {};
+
+            Object.values(summonerSpellJson.data).forEach(
+              (summonerSpellDto) => {
+                remappedData[summonerSpellDto.key] = summonerSpellDto;
+              }
+            );
+
+            summonerSpellJson.data = remappedData;
+            return summonerSpellJson;
+          }
+
+          return data;
+        },
+      }
+    );
+  };
+
+  summonerSpellSpriteSheetUrl = (
     dataDragonVersion: string,
-    imageName: string
-  ): Promise<string> => {
-    return `https://ddragon.leagueoflegends.com/cdn/${dataDragonVersion}/img/champion/${imageName}`;
+    id: string
+  ): string => {
+    return `${
+      this.#dataDragonInstance.defaults.baseURL
+    }cdn/${dataDragonVersion}/img/sprite/${id}`;
+  };
+
+  runes = (dataDragonVersion: string): Promise<AxiosResponse<RuneMap>> => {
+    return this.#dataDragonInstance.get<RuneMap>(
+      `cdn/${dataDragonVersion}/data/en_US/runesReforged.json`,
+      {
+        transformResponse: (data: string | undefined) => {
+          if (data) {
+            const runeResponse: RuneResponse = JSON.parse(data);
+            const runeMap: RuneMap = {};
+
+            runeResponse.forEach((tree) => {
+              tree.slots.forEach((runeRow) => {
+                runeRow.runes.forEach((rune) => {
+                  runeMap[rune.id] = rune;
+                });
+              });
+            });
+
+            return runeMap;
+          }
+
+          return data;
+        },
+      }
+    );
+  };
+
+  runeImageUrl = (imagePath: string): string => {
+    return `${this.#dataDragonInstance.defaults.baseURL}cdn/img/${imagePath}`;
   };
 
   summoner = {
     byName: (summonerName: string): Promise<AxiosResponse<SummonerDto>> => {
-      return this.#instance.get<SummonerDto>(
-        `summoner/v4/summoners/by-name/${summonerName}`
+      return this.#riotInstance.get<SummonerDto>(
+        `summoner/v4/summoners/by-name/${encodeURI(summonerName)}`
       );
     },
   };
 
   match = {
     byMatchId: (matchId: number): Promise<AxiosResponse<MatchDto>> => {
-      return this.#instance.get<MatchDto>(`match/v4/matches/${matchId}`);
+      return this.#riotInstance.get<MatchDto>(`match/v4/matches/${matchId}`);
     },
   };
 
   matchList = {
     byAccountId: (accountId: string): Promise<AxiosResponse<MatchListDto>> => {
-      return this.#instance.get<MatchListDto>(
+      return this.#riotInstance.get<MatchListDto>(
         `match/v4/matchlists/by-account/${accountId}?endIndex=1`
       );
     },
@@ -325,7 +526,7 @@ export class RiotApi {
 
   timeline = {
     byMatchId: (matchId: number): Promise<AxiosResponse<MatchTimelineDto>> => {
-      return this.#instance.get<MatchTimelineDto>(
+      return this.#riotInstance.get<MatchTimelineDto>(
         `match/v4/timelines/by-match/${matchId}?endIndex=1`
       );
     },

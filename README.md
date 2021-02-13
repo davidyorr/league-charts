@@ -27,7 +27,7 @@ leagueCharts.barChart({
 ```
 
 ```html
-<canvas id="champion-damage-chart" width="600" height="500" />
+<canvas id="champion-damage-chart" width="750" height="500" />
 ```
 
 ![bar chart screenshot](/cypress/snapshots/charts.test.ts/charts%20--%20bar%20chart%20(1).snap.png)
@@ -48,5 +48,17 @@ leagueCharts.lineChart({
 <canvas id="gold-advantage-chart" width="800" height="400" />
 ```
 
-![line chart screenshot](cypress/snapshots/charts.test.ts/charts%20--%20line%20chart%20(1).snap.png)
+![line chart screenshot](/cypress/snapshots/charts.test.ts/charts%20--%20line%20chart%20(1).snap.png)
 
+```typescript
+  const leagueCharts = new LeagueCharts("riot-api-key");
+  leagueCharts.scoreboard({
+    chartContext: document.getElementById("scoreboard"),
+    summonerName: "AudreyRuston",
+  });
+```
+
+```html
+<canvas id="scoreboard" width="800" height="450" />
+```
+![scoreboard screenshot](/cypress/snapshots/charts.test.ts/charts%20--%20scoreboard%20(1).snap.png)

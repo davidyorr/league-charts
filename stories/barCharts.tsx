@@ -45,7 +45,7 @@ export const Story: {
     });
   }, [stat]);
 
-  return <canvas id="bar-chart" width="600" height="500" />;
+  return <canvas id="bar-chart" width="750" height="500" />;
 };
 
 Story.args = {
