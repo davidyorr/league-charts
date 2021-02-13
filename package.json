@@ -11,7 +11,11 @@
     "README.md"
   ],
   "scripts": {
+    "copy-assets": "copyfiles --flat src/assets/**/* dist/assets",
     "build": "yarn run tsc --extendedDiagnostics",
+    "postbuild": "yarn run copy-assets",
+    "prestorybook": "yarn run copy-assets",
+    "prestorybook:build": "yarn run copy-assets",
     "storybook": "concurrently \"tsc --watch\" \"start-storybook -p 6006\"",
     "storybook:build": "build-storybook --output-dir ./public/storybook",
     "format": "prettier src stories .storybook cypress",
@@ -23,12 +27,14 @@
     "@storybook/addon-controls": "^6.0.26",
     "@storybook/client-api": "^6.0.26",
     "@storybook/react": "^6.0.26",
+    "@types/css-font-loading-module": "^0.0.4",
     "@types/cypress-image-snapshot": "^3.1.2",
     "@types/node": "^14.6.4",
     "@typescript-eslint/eslint-plugin": "^4.4.0",
     "@typescript-eslint/parser": "^4.4.0",
     "axios-mock-adapter": "^1.18.2",
     "concurrently": "^5.3.0",
+    "copyfiles": "^2.4.1",
     "cypress": "^5.4.0",
     "cypress-image-snapshot": "^3.1.1",
     "cypress-wait-until": "^1.7.1",
@@ -41,6 +47,7 @@
     "@types/chart.js": "^2.9.24",
     "axios": "^0.20.0",
     "canvas": "^2.6.1",
-    "chart.js": "^2.9.3"
+    "chart.js": "^2.9.3",
+    "comma-number": "^2.0.1"
   }
 }

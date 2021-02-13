@@ -15,4 +15,12 @@ describe("charts", () => {
     cy.get("canvas").screenshot();
     cy.get("canvas").matchImageSnapshot();
   });
+  it("scoreboard", () => {
+    cy.visit(
+      `public/storybook/iframe.html?id=scoreboard--story&viewMode=story`
+    );
+    cy.waitUntil(() => cy.get("canvas.loaded"));
+    cy.get("canvas").screenshot();
+    cy.get("canvas").matchImageSnapshot();
+  });
 });
