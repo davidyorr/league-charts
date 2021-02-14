@@ -157,7 +157,7 @@ export class LeagueCharts {
     matchResponse: AxiosResponse<MatchDto>,
     dataDragonVersion: string
   ): Promise<SpriteSheet> {
-    return this.imageSpriteSheet(
+    return await this.imageSpriteSheet(
       matchResponse,
       async (championImageSpriteSheets, participant) => {
         if (this.#champions) {
@@ -168,7 +168,13 @@ export class LeagueCharts {
           );
 
           if (!championImageSpriteSheets[spriteId]) {
-            championImageSpriteSheets[spriteId] = await loadImage(url);
+            try {
+              championImageSpriteSheets[spriteId] = await loadImage(url);
+            } catch (err) {
+              console.log(
+                `error loading image for champion sprite sheet [spriteId:${spriteId}] [url:${url}]`
+              );
+            }
           }
         }
       }
@@ -233,7 +239,13 @@ export class LeagueCharts {
               );
 
               if (!itemImageSpriteSheets[spriteId]) {
-                itemImageSpriteSheets[spriteId] = await loadImage(url);
+                try {
+                  itemImageSpriteSheets[spriteId] = await loadImage(url);
+                } catch (err) {
+                  console.log(
+                    `error loading image for item sprite sheet [spriteId:${spriteId}] [url:${url}]`
+                  );
+                }
               }
             }
           }
@@ -257,7 +269,13 @@ export class LeagueCharts {
               );
 
               if (!summonerSpellSpriteSheets[spriteId]) {
-                summonerSpellSpriteSheets[spriteId] = await loadImage(url);
+                try {
+                  summonerSpellSpriteSheets[spriteId] = await loadImage(url);
+                } catch (err) {
+                  console.log(
+                    `error loading image for summoner spell sprite sheet [spriteId:${spriteId}] [url:${url}]`
+                  );
+                }
               }
             }
           }
@@ -275,7 +293,13 @@ export class LeagueCharts {
           const url = this.#api.runeImageUrl(runePath);
 
           if (!runeImages[runeId]) {
-            runeImages[runeId] = await loadImage(url);
+            try {
+              runeImages[runeId] = await loadImage(url);
+            } catch (err) {
+              console.log(
+                `error loading image for rune [runeId:${runeId}] [url:${url}]`
+              );
+            }
           }
         }
       }
