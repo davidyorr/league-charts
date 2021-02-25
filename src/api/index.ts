@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { IAxiosCacheAdapterOptions, setupCache } from "axios-cache-adapter";
 
 // Summoner
 // ----------------
@@ -331,8 +332,18 @@ export class Api {
   #riotInstance: AxiosInstance;
   #dataDragonInstance: AxiosInstance;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, cacheOptions?: IAxiosCacheAdapterOptions) {
+    const cache = cacheOptions
+      ? setupCache({
+          exclude: {
+            query: false,
+          },
+          ...cacheOptions,
+        })
+      : undefined;
+
     this.#riotInstance = axios.create({
+      adapter: cache?.adapter,
       baseURL: "https://na1.api.riotgames.com/lol/",
       headers: {
         [X_RIOT_TOKEN_HEADER]: apiKey,

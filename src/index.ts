@@ -21,8 +21,8 @@ import {
 } from "chart.js";
 
 import { Image, loadImage, registerFont } from "canvas";
-import { AxiosResponse } from "axios";
 import { Colors } from "./colors";
+import { IAxiosCacheAdapterOptions } from "axios-cache-adapter";
 import commaNumber from "comma-number";
 
 type SpriteSheet = {
@@ -48,6 +48,7 @@ type FunctionParams = {
   chartPlugins?: PluginServiceRegistrationOptions[];
   afterRender?: () => void;
 };
+
 export class LeagueCharts {
   #api: Api;
   // the last data dragon version used, not the most recent version available
@@ -61,8 +62,8 @@ export class LeagueCharts {
   // cache of the runes fetched from data dragon
   #runes: RuneMap | undefined;
 
-  constructor(apiKey: string) {
-    this.#api = new Api(apiKey);
+  constructor(apiKey: string, cacheOptions?: IAxiosCacheAdapterOptions) {
+    this.#api = new Api(apiKey, cacheOptions);
 
     Chart.defaults.global.defaultFontColor = Colors.primaryText;
     Chart.defaults.global.defaultFontStyle = "normal";
@@ -79,16 +80,16 @@ export class LeagueCharts {
     }
   }
 
-  private async getLastMatchResponse(summonerName: string) {
+  private async getLastMatchDto(summonerName: string): Promise<MatchDto> {
     const summonerResponse = await this.#api.summoner.byName(summonerName);
     const matchListResponse = await this.#api.matchList.byAccountId(
       summonerResponse.data.accountId
     );
-    const matchResponse = await this.#api.match.byMatchId(
-      matchListResponse.data.matches[0].gameId
-    );
+    const matchDto = (
+      await this.#api.match.byMatchId(matchListResponse.data.matches[0].gameId)
+    ).data;
 
-    return matchResponse;
+    return matchDto;
   }
 
   private convertValueToKilos(value: string | number) {
@@ -99,6 +100,22 @@ export class LeagueCharts {
     return value
       .replace(/[A-Z]/g, (str) => ` ${str}`)
       .replace(/^./g, (str) => str.toUpperCase());
+  }
+
+  private async populateDataDragonCache(
+    dataDragonVersion: string
+  ): Promise<void> {
+    try {
+      this.#champions = (await this.#api.champions(dataDragonVersion)).data;
+      this.#items = (await this.#api.items(dataDragonVersion)).data;
+      this.#summonerSpells = (
+        await this.#api.summonerSpells(dataDragonVersion)
+      ).data;
+      this.#runes = (await this.#api.runes(dataDragonVersion)).data;
+    } catch (err) {
+      console.log("error fetching data dragon json files", err);
+      throw err;
+    }
   }
 
   private addGradientBackground(chartContext: any): void {
@@ -138,7 +155,7 @@ export class LeagueCharts {
   }
 
   private async imageSpriteSheet(
-    matchResponse: AxiosResponse<MatchDto>,
+    matchDto: MatchDto,
     populateSpriteSheet: (
       imageSpriteSheet: SpriteSheet,
       participant: MatchDto["participants"][0]
@@ -146,7 +163,7 @@ export class LeagueCharts {
   ): Promise<SpriteSheet> {
     const imageSpriteSheet: SpriteSheet = {};
 
-    for (const participant of matchResponse.data.participants) {
+    for (const participant of matchDto.participants) {
       await populateSpriteSheet(imageSpriteSheet, participant);
     }
 
@@ -154,11 +171,11 @@ export class LeagueCharts {
   }
 
   private async championImageSpriteSheets(
-    matchResponse: AxiosResponse<MatchDto>,
+    matchDto: MatchDto,
     dataDragonVersion: string
   ): Promise<SpriteSheet> {
     return await this.imageSpriteSheet(
-      matchResponse,
+      matchDto,
       async (championImageSpriteSheets, participant) => {
         if (this.#champions) {
           const spriteId = this.#champions[participant.championId].image.sprite;
@@ -174,6 +191,7 @@ export class LeagueCharts {
               console.log(
                 `error loading image for champion sprite sheet [spriteId:${spriteId}] [url:${url}]`
               );
+              console.log(err);
             }
           }
         }
@@ -194,38 +212,28 @@ export class LeagueCharts {
       this.#api.setRegion(region);
     }
 
-    const matchResponse = await this.getLastMatchResponse(summonerName);
+    const matchDto = await this.getLastMatchDto(summonerName);
 
     // get the data dragon version
     const dataDragonVersion = await this.#api.dataDragonVersion(
-      matchResponse.data.gameVersion
+      matchDto.gameVersion
     );
 
     if (this.#lastDataDragonVersion !== dataDragonVersion) {
-      try {
-        this.#champions = (await this.#api.champions(dataDragonVersion)).data;
-        this.#items = (await this.#api.items(dataDragonVersion)).data;
-        this.#summonerSpells = (
-          await this.#api.summonerSpells(dataDragonVersion)
-        ).data;
-        this.#runes = (await this.#api.runes(dataDragonVersion)).data;
-      } catch (err) {
-        console.log("error fetching data dragon json files", err);
-        throw err;
-      }
+      await this.populateDataDragonCache(dataDragonVersion);
     }
 
     this.#lastDataDragonVersion = dataDragonVersion;
 
     // load sprite sheets for the champion images
     const championImageSpriteSheets = await this.championImageSpriteSheets(
-      matchResponse,
+      matchDto,
       dataDragonVersion
     );
 
     // load sprite sheets for the item images
     const itemImageSpriteSheets = await this.imageSpriteSheet(
-      matchResponse,
+      matchDto,
       async (itemImageSpriteSheets, participant) => {
         if (this.#items) {
           for (let j = 0; j <= 6; j++) {
@@ -255,7 +263,7 @@ export class LeagueCharts {
 
     // load sprite sheets for the summoner spell images
     const summonerSpellSpriteSheets = await this.imageSpriteSheet(
-      matchResponse,
+      matchDto,
       async (summonerSpellSpriteSheets, participant) => {
         if (this.#summonerSpells) {
           for (let j = 1; j <= 2; j++) {
@@ -285,7 +293,7 @@ export class LeagueCharts {
 
     // load the rune images
     const runeImages = await this.imageSpriteSheet(
-      matchResponse,
+      matchDto,
       async (runeImages, participant) => {
         if (this.#runes) {
           const runeId = participant.stats.perk0;
@@ -331,123 +339,119 @@ export class LeagueCharts {
     const summonerSpellSize = 14;
     const middleGap = 45;
 
-    matchResponse.data.participantIdentities.forEach(
-      (participantIdentity, i) => {
-        const y = yStart + rowHeight * i + (i > 4 ? middleGap : 0);
+    matchDto.participantIdentities.forEach((participantIdentity, i) => {
+      const y = yStart + rowHeight * i + (i > 4 ? middleGap : 0);
 
-        // draw the primary keystone (rune)
-        const runeId = matchResponse.data.participants[i].stats.perk0;
-        const image = runeImages[runeId];
-        if (image) {
-          ctx.drawImage(image, xRune, y - rowHeight / 2, runeSize, runeSize);
-        }
+      // draw the primary keystone (rune)
+      const runeId = matchDto.participants[i].stats.perk0;
+      const image = runeImages[runeId];
+      if (image) {
+        ctx.drawImage(image, xRune, y - rowHeight / 2, runeSize, runeSize);
+      }
 
-        // draw the summoner spells
-        for (let j = 1; j <= 2; j++) {
-          const summonerSpellId =
-            matchResponse.data.participants[i][`spell${j}Id` as "spell1Id"];
+      // draw the summoner spells
+      for (let j = 1; j <= 2; j++) {
+        const summonerSpellId =
+          matchDto.participants[i][`spell${j}Id` as "spell1Id"];
 
-          // draw the yellow border around the summoner spell
-          ctx.strokeColor = Colors.iconBorder;
-          ctx.lineWidth = 0.25;
-          ctx.strokeRect(
-            xSummonerSpell,
-            y - rowHeight + 1 + summonerSpellSize * j,
-            summonerSpellSize,
-            summonerSpellSize
-          );
-
-          // draw the summoner spell
-          if (this.#summonerSpells) {
-            const summonerSpell = this.#summonerSpells.data[summonerSpellId];
-            const image = summonerSpellSpriteSheets[summonerSpell.image.sprite];
-            if (image) {
-              ctx.drawImage(
-                image,
-                summonerSpell.image.x,
-                summonerSpell.image.y,
-                summonerSpell.image.w,
-                summonerSpell.image.h,
-                xSummonerSpell,
-                y - rowHeight + 1 + summonerSpellSize * j,
-                summonerSpellSize,
-                summonerSpellSize
-              );
-            }
-          }
-        }
-
-        // draw the champion level
-        ctx.font = "14px Karla, sans-serif";
-        ctx.fillStyle = Colors.primaryText;
-        ctx.fillText(
-          matchResponse.data.participants[i].stats.champLevel,
-          xChampionLevel,
-          y
+        // draw the yellow border around the summoner spell
+        ctx.strokeColor = Colors.iconBorder;
+        ctx.lineWidth = 0.25;
+        ctx.strokeRect(
+          xSummonerSpell,
+          y - rowHeight + 1 + summonerSpellSize * j,
+          summonerSpellSize,
+          summonerSpellSize
         );
 
-        // draw the champion images
-        if (this.#champions) {
-          const imageDto = this.#champions[
-            matchResponse.data.participants[i].championId
-          ].image;
-          const image = championImageSpriteSheets[imageDto.sprite];
+        // draw the summoner spell
+        if (this.#summonerSpells) {
+          const summonerSpell = this.#summonerSpells.data[summonerSpellId];
+          const image = summonerSpellSpriteSheets[summonerSpell.image.sprite];
           if (image) {
-            ctx?.drawImage(
-              image as any,
-              imageDto.x,
-              imageDto.y,
-              imageDto.w,
-              imageDto.h,
-              xChampionIcon,
-              y - rowHeight / 2 - 3,
-              championIconSize,
-              championIconSize
+            ctx.drawImage(
+              image,
+              summonerSpell.image.x,
+              summonerSpell.image.y,
+              summonerSpell.image.w,
+              summonerSpell.image.h,
+              xSummonerSpell,
+              y - rowHeight + 1 + summonerSpellSize * j,
+              summonerSpellSize,
+              summonerSpellSize
             );
           }
         }
+      }
 
-        // draw the summoner name
-        ctx.font = "12px Rubik, sans-serif";
-        ctx.fillStyle = Colors.secondaryText;
-        ctx.fillText(participantIdentity.player.summonerName, xSummonerName, y);
+      // draw the champion level
+      ctx.font = "14px Karla, sans-serif";
+      ctx.fillStyle = Colors.primaryText;
+      ctx.fillText(
+        matchDto.participants[i].stats.champLevel,
+        xChampionLevel,
+        y
+      );
 
-        // draw the items
-        for (let j = 0; j <= 6; j++) {
-          const itemId =
-            matchResponse.data.participants[i].stats[`item${j}` as "item0"];
-
-          // draw the yellow border around the item
-          ctx.strokeStyle = Colors.iconBorder;
-          ctx.lineWidth = 0.25;
-          ctx.strokeRect(
-            xItem + j * itemSize,
-            y - itemSize / 2 - 3,
-            itemSize,
-            itemSize
+      // draw the champion images
+      if (this.#champions) {
+        const imageDto = this.#champions[matchDto.participants[i].championId]
+          .image;
+        const image = championImageSpriteSheets[imageDto.sprite];
+        if (image) {
+          ctx?.drawImage(
+            image as any,
+            imageDto.x,
+            imageDto.y,
+            imageDto.w,
+            imageDto.h,
+            xChampionIcon,
+            y - rowHeight / 2 - 3,
+            championIconSize,
+            championIconSize
           );
+        }
+      }
 
-          // draw the item
-          if (itemId && this.#items) {
-            const item = this.#items.data[itemId];
-            const image = itemImageSpriteSheets[item.image.sprite];
-            if (image) {
-              ctx.drawImage(
-                image,
-                item.image.x,
-                item.image.y,
-                item.image.w,
-                item.image.h,
-                xItem + j * itemSize,
-                y - itemSize / 2 - 3,
-                itemSize,
-                itemSize
-              );
-            }
+      // draw the summoner name
+      ctx.font = "12px Rubik, sans-serif";
+      ctx.fillStyle = Colors.secondaryText;
+      ctx.fillText(participantIdentity.player.summonerName, xSummonerName, y);
+
+      // draw the items
+      for (let j = 0; j <= 6; j++) {
+        const itemId = matchDto.participants[i].stats[`item${j}` as "item0"];
+
+        // draw the yellow border around the item
+        ctx.strokeStyle = Colors.iconBorder;
+        ctx.lineWidth = 0.25;
+        ctx.strokeRect(
+          xItem + j * itemSize,
+          y - itemSize / 2 - 3,
+          itemSize,
+          itemSize
+        );
+
+        // draw the item
+        if (itemId && this.#items) {
+          const item = this.#items.data[itemId];
+          const image = itemImageSpriteSheets[item.image.sprite];
+          if (image) {
+            ctx.drawImage(
+              image,
+              item.image.x,
+              item.image.y,
+              item.image.w,
+              item.image.h,
+              xItem + j * itemSize,
+              y - itemSize / 2 - 3,
+              itemSize,
+              itemSize
+            );
           }
         }
       }
-    );
+    });
 
     let team1Kills = 0;
     let team1Deaths = 0;
@@ -461,7 +465,7 @@ export class LeagueCharts {
     ctx.font = "12px Rubik, sans-serif";
     ctx.fillStyle = Colors.primaryText;
 
-    matchResponse.data.participants.forEach((participant, i) => {
+    matchDto.participants.forEach((participant, i) => {
       const y = yStart + rowHeight * i + (i > 4 ? 40 : 0);
 
       ctx.fillText(participant.stats.kills, xKda, y);
@@ -543,18 +547,13 @@ export class LeagueCharts {
       this.#api.setRegion(region);
     }
 
-    const matchResponse = await this.getLastMatchResponse(summonerName);
+    const matchDto = await this.getLastMatchDto(summonerName);
     const dataDragonVersion = await this.#api.dataDragonVersion(
-      matchResponse.data.gameVersion
+      matchDto.gameVersion
     );
 
     if (this.#lastDataDragonVersion !== dataDragonVersion) {
-      try {
-        this.#champions = (await this.#api.champions(dataDragonVersion)).data;
-      } catch (err) {
-        console.log("error fetching champion.json", err);
-        throw err;
-      }
+      await this.populateDataDragonCache(dataDragonVersion);
     }
 
     this.#lastDataDragonVersion = dataDragonVersion;
@@ -564,7 +563,7 @@ export class LeagueCharts {
     const data: ChartData = {
       datasets: [
         {
-          data: matchResponse.data.participants.map((participant) => {
+          data: matchDto.participants.map((participant) => {
             // maybe only allow chartStat to be a type that makes value a number
             // or make an explicit list of certain properties instead of any stat
             const value = participant.stats[chartStat];
@@ -583,7 +582,7 @@ export class LeagueCharts {
           label: undefined,
         },
       ],
-      labels: matchResponse.data.participantIdentities.map(
+      labels: matchDto.participantIdentities.map(
         (identity) => identity.player.summonerName
       ),
     };
@@ -629,7 +628,7 @@ export class LeagueCharts {
       {
         afterRender: async (chart) => {
           const championImageSpriteSheets = await this.championImageSpriteSheets(
-            matchResponse,
+            matchDto,
             dataDragonVersion
           );
 
@@ -641,7 +640,7 @@ export class LeagueCharts {
 
             if (this.#champions) {
               const imageDto = this.#champions[
-                matchResponse.data.participants[index].championId
+                matchDto.participants[index].championId
               ].image;
               const image = championImageSpriteSheets[imageDto.sprite];
               if (image) {
@@ -702,12 +701,10 @@ export class LeagueCharts {
       this.#api.setRegion(region);
     }
 
-    const matchResponse = await this.getLastMatchResponse(summonerName);
+    const matchDto = await this.getLastMatchDto(summonerName);
     let timelineResponse;
     try {
-      timelineResponse = await this.#api.timeline.byMatchId(
-        matchResponse.data.gameId
-      );
+      timelineResponse = await this.#api.timeline.byMatchId(matchDto.gameId);
     } catch (error) {
       console.log("error", error);
     }
@@ -717,7 +714,7 @@ export class LeagueCharts {
     let max = 0;
 
     const summonerParticipantId =
-      matchResponse.data.participantIdentities.find(
+      matchDto.participantIdentities.find(
         (particiantIdentity) =>
           particiantIdentity.player.summonerName
             .toLowerCase()
