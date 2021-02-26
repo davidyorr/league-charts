@@ -1,9 +1,10 @@
 describe("charts", () => {
+  const timeout = 8000;
   it("bar chart", () => {
     cy.visit(
       `public/storybook/iframe.html?id=bar-charts--story&viewMode=story`
     );
-    cy.waitUntil(() => cy.get("canvas.loaded"));
+    cy.waitUntil(() => cy.get("canvas.loaded"), { timeout });
     cy.get("canvas").screenshot();
     cy.get("canvas").matchImageSnapshot();
   });
@@ -11,7 +12,7 @@ describe("charts", () => {
     cy.visit(
       `public/storybook/iframe.html?id=line-charts--story&viewMode=story`
     );
-    cy.waitUntil(() => cy.get("canvas.loaded"));
+    cy.waitUntil(() => cy.get("canvas.loaded"), { timeout });
     cy.get("canvas").screenshot();
     cy.get("canvas").matchImageSnapshot();
   });
@@ -19,7 +20,7 @@ describe("charts", () => {
     cy.visit(
       `public/storybook/iframe.html?id=scoreboard--story&viewMode=story`
     );
-    cy.waitUntil(() => cy.get("canvas.loaded"));
+    cy.waitUntil(() => cy.get("canvas.loaded"), { timeout });
     cy.get("canvas").screenshot();
     cy.get("canvas").matchImageSnapshot();
   });
