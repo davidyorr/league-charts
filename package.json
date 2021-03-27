@@ -1,6 +1,6 @@
 {
   "name": "league-charts",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "league charts",
   "main": "dist/index.js",
   "repository": "git@github.com:davidyorr/league-charts.git",
