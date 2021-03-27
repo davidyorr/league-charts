@@ -231,8 +231,10 @@ type ChampionDto = {
   stats: any;
 };
 
+// there's no guarantee the data dragon objects will contain a DTO, for example https://github.com/RiotGames/developer-relations/issues/419
+
 export type ChampionMap = {
-  [index: string]: ChampionDto;
+  [index: string]: ChampionDto | undefined;
 };
 
 export type ItemJson = {
@@ -240,7 +242,7 @@ export type ItemJson = {
   version: string;
   basic: any;
   data: {
-    [id: number]: ItemDto;
+    [id: number]: ItemDto | undefined;
   };
   groups: any[];
   tree: any[];
@@ -282,7 +284,7 @@ export type SummonerSpellJson = {
   type: string;
   version: string;
   data: {
-    [id: string]: SummonerSpellDto;
+    [id: string]: SummonerSpellDto | undefined;
   };
 };
 
@@ -460,7 +462,9 @@ export class Api {
 
             Object.values(summonerSpellJson.data).forEach(
               (summonerSpellDto) => {
-                remappedData[summonerSpellDto.key] = summonerSpellDto;
+                if (summonerSpellDto) {
+                  remappedData[summonerSpellDto.key] = summonerSpellDto;
+                }
               }
             );
 

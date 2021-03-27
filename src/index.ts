@@ -178,20 +178,24 @@ export class LeagueCharts {
       matchDto,
       async (championImageSpriteSheets, participant) => {
         if (this.#champions) {
-          const spriteId = this.#champions[participant.championId].image.sprite;
-          const url = this.#api.championImageSpriteSheetUrl(
-            dataDragonVersion,
-            spriteId
-          );
+          const spriteId = this.#champions[participant.championId]?.image
+            .sprite;
 
-          if (!championImageSpriteSheets[spriteId]) {
-            try {
-              championImageSpriteSheets[spriteId] = await loadImage(url);
-            } catch (err) {
-              console.log(
-                `error loading image for champion sprite sheet [spriteId:${spriteId}] [url:${url}]`
-              );
-              console.log(err);
+          if (spriteId) {
+            const url = this.#api.championImageSpriteSheetUrl(
+              dataDragonVersion,
+              spriteId
+            );
+
+            if (!championImageSpriteSheets[spriteId]) {
+              try {
+                championImageSpriteSheets[spriteId] = await loadImage(url);
+              } catch (err) {
+                console.log(
+                  `error loading image for champion sprite sheet [spriteId:${spriteId}] [url:${url}]`
+                );
+                console.log(err);
+              }
             }
           }
         }
@@ -240,19 +244,22 @@ export class LeagueCharts {
             const itemId = participant.stats[`item${j}` as "item0"];
 
             if (itemId) {
-              const spriteId = this.#items.data[itemId].image.sprite;
-              const url = this.#api.itemSpriteSheetUrl(
-                dataDragonVersion,
-                spriteId
-              );
+              const spriteId = this.#items.data[itemId]?.image.sprite;
 
-              if (!itemImageSpriteSheets[spriteId]) {
-                try {
-                  itemImageSpriteSheets[spriteId] = await loadImage(url);
-                } catch (err) {
-                  console.log(
-                    `error loading image for item sprite sheet [spriteId:${spriteId}] [url:${url}]`
-                  );
+              if (spriteId) {
+                const url = this.#api.itemSpriteSheetUrl(
+                  dataDragonVersion,
+                  spriteId
+                );
+
+                if (!itemImageSpriteSheets[spriteId]) {
+                  try {
+                    itemImageSpriteSheets[spriteId] = await loadImage(url);
+                  } catch (err) {
+                    console.log(
+                      `error loading image for item sprite sheet [spriteId:${spriteId}] [url:${url}]`
+                    );
+                  }
                 }
               }
             }
@@ -270,19 +277,22 @@ export class LeagueCharts {
             const spellId = participant[`spell${j}Id` as "spell1Id"];
 
             if (spellId) {
-              const spriteId = this.#summonerSpells.data[spellId].image.sprite;
-              const url = this.#api.summonerSpellSpriteSheetUrl(
-                dataDragonVersion,
-                spriteId
-              );
+              const spriteId = this.#summonerSpells.data[spellId]?.image.sprite;
 
-              if (!summonerSpellSpriteSheets[spriteId]) {
-                try {
-                  summonerSpellSpriteSheets[spriteId] = await loadImage(url);
-                } catch (err) {
-                  console.log(
-                    `error loading image for summoner spell sprite sheet [spriteId:${spriteId}] [url:${url}]`
-                  );
+              if (spriteId) {
+                const url = this.#api.summonerSpellSpriteSheetUrl(
+                  dataDragonVersion,
+                  spriteId
+                );
+
+                if (!summonerSpellSpriteSheets[spriteId]) {
+                  try {
+                    summonerSpellSpriteSheets[spriteId] = await loadImage(url);
+                  } catch (err) {
+                    console.log(
+                      `error loading image for summoner spell sprite sheet [spriteId:${spriteId}] [url:${url}]`
+                    );
+                  }
                 }
               }
             }
@@ -367,19 +377,22 @@ export class LeagueCharts {
         // draw the summoner spell
         if (this.#summonerSpells) {
           const summonerSpell = this.#summonerSpells.data[summonerSpellId];
-          const image = summonerSpellSpriteSheets[summonerSpell.image.sprite];
-          if (image) {
-            ctx.drawImage(
-              image,
-              summonerSpell.image.x,
-              summonerSpell.image.y,
-              summonerSpell.image.w,
-              summonerSpell.image.h,
-              xSummonerSpell,
-              y - rowHeight + 1 + summonerSpellSize * j,
-              summonerSpellSize,
-              summonerSpellSize
-            );
+
+          if (summonerSpell) {
+            const image = summonerSpellSpriteSheets[summonerSpell.image.sprite];
+            if (image) {
+              ctx.drawImage(
+                image,
+                summonerSpell.image.x,
+                summonerSpell.image.y,
+                summonerSpell.image.w,
+                summonerSpell.image.h,
+                xSummonerSpell,
+                y - rowHeight + 1 + summonerSpellSize * j,
+                summonerSpellSize,
+                summonerSpellSize
+              );
+            }
           }
         }
       }
@@ -396,20 +409,23 @@ export class LeagueCharts {
       // draw the champion images
       if (this.#champions) {
         const imageDto = this.#champions[matchDto.participants[i].championId]
-          .image;
-        const image = championImageSpriteSheets[imageDto.sprite];
-        if (image) {
-          ctx?.drawImage(
-            image as any,
-            imageDto.x,
-            imageDto.y,
-            imageDto.w,
-            imageDto.h,
-            xChampionIcon,
-            y - rowHeight / 2 - 3,
-            championIconSize,
-            championIconSize
-          );
+          ?.image;
+
+        if (imageDto) {
+          const image = championImageSpriteSheets[imageDto.sprite];
+          if (image) {
+            ctx?.drawImage(
+              image as any,
+              imageDto.x,
+              imageDto.y,
+              imageDto.w,
+              imageDto.h,
+              xChampionIcon,
+              y - rowHeight / 2 - 3,
+              championIconSize,
+              championIconSize
+            );
+          }
         }
       }
 
@@ -435,19 +451,21 @@ export class LeagueCharts {
         // draw the item
         if (itemId && this.#items) {
           const item = this.#items.data[itemId];
-          const image = itemImageSpriteSheets[item.image.sprite];
-          if (image) {
-            ctx.drawImage(
-              image,
-              item.image.x,
-              item.image.y,
-              item.image.w,
-              item.image.h,
-              xItem + j * itemSize,
-              y - itemSize / 2 - 3,
-              itemSize,
-              itemSize
-            );
+          if (item) {
+            const image = itemImageSpriteSheets[item.image.sprite];
+            if (image) {
+              ctx.drawImage(
+                image,
+                item.image.x,
+                item.image.y,
+                item.image.w,
+                item.image.h,
+                xItem + j * itemSize,
+                y - itemSize / 2 - 3,
+                itemSize,
+                itemSize
+              );
+            }
           }
         }
       }
@@ -641,20 +659,23 @@ export class LeagueCharts {
             if (this.#champions) {
               const imageDto = this.#champions[
                 matchDto.participants[index].championId
-              ].image;
-              const image = championImageSpriteSheets[imageDto.sprite];
-              if (image) {
-                chart.ctx?.drawImage(
-                  image as any,
-                  imageDto.x,
-                  imageDto.y,
-                  imageDto.w,
-                  imageDto.h,
-                  yAxis.right - IMAGE_SIZE - IMAGE_SIZE / 2,
-                  y - IMAGE_SIZE / 2,
-                  IMAGE_SIZE,
-                  IMAGE_SIZE
-                );
+              ]?.image;
+
+              if (imageDto) {
+                const image = championImageSpriteSheets[imageDto.sprite];
+                if (image) {
+                  chart.ctx?.drawImage(
+                    image as any,
+                    imageDto.x,
+                    imageDto.y,
+                    imageDto.w,
+                    imageDto.h,
+                    yAxis.right - IMAGE_SIZE - IMAGE_SIZE / 2,
+                    y - IMAGE_SIZE / 2,
+                    IMAGE_SIZE,
+                    IMAGE_SIZE
+                  );
+                }
               }
             }
           });
