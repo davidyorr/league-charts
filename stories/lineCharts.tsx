@@ -4,7 +4,7 @@ import MockAdapter from "axios-mock-adapter";
 import React from "react";
 import axios from "axios";
 import { matchDto } from "./mock/match";
-import { matchListDto } from "./mock/match-list";
+import { matchIds } from "./mock/match-list";
 import { summonerDto } from "./mock/summoner";
 import { timelineDto } from "./mock/timeline";
 import { useEffect } from "@storybook/client-api";
@@ -17,13 +17,15 @@ mock
   )
   .reply(200, summonerDto)
   .onGet(
-    "https://na1.api.riotgames.com/lol/match/v4/matchlists/by-account/th9QQeUUH1ZBtWckQpcnFcq9DG30jdyl-Qy3hTbdIOzA4c2ssG8k0Wvm?endIndex=1"
+    "https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/fkqfvV7L5LRjJNZzfZOwwh4EdGKwspVeFBh1iMc2cuEx_CPvtQgKDRi7d9AITQYiAXBdpEwSvXSlTg/ids?count=1"
   )
-  .reply(200, matchListDto)
-  .onGet("https://na1.api.riotgames.com/lol/match/v4/matches/3590307953")
+  .reply(200, matchIds)
+  .onGet(
+    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4128286830"
+  )
   .reply(200, matchDto)
   .onGet(
-    "https://na1.api.riotgames.com/lol/match/v4/timelines/by-match/3590307953?endIndex=1"
+    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4128286830/timeline"
   )
   .reply(200, timelineDto)
   .onAny()

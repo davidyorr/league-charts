@@ -4,7 +4,6 @@ import {
   ItemJson,
   MatchDto,
   MatchParticipantFrameDto,
-  ParticipantStatsDto,
   RuneMap,
   SummonerSpellJson,
 } from "./api";
@@ -24,6 +23,7 @@ import { Image, loadImage, registerFont } from "canvas";
 import { Colors } from "./colors";
 import { IAxiosCacheAdapterOptions } from "axios-cache-adapter";
 import commaNumber from "comma-number";
+import parseMilliseconds from "parse-ms";
 
 type SpriteSheet = {
   [id: string]: Image;
@@ -48,6 +48,8 @@ type FunctionParams = {
   chartPlugins?: PluginServiceRegistrationOptions[];
   afterRender?: () => void;
 };
+
+export type BarChartStat = "totalDamageDealtToChampions";
 
 export class LeagueCharts {
   #api: Api;
@@ -80,14 +82,17 @@ export class LeagueCharts {
     }
   }
 
-  private async getLastMatchDto(summonerName: string): Promise<MatchDto> {
+  private async getLastMatchId(summonerName: string): Promise<string> {
     const summonerResponse = await this.#api.summoner.byName(summonerName);
-    const matchListResponse = await this.#api.matchList.byAccountId(
-      summonerResponse.data.accountId
+    const matchIdsResponse = await this.#api.matchIds.byPuuid(
+      summonerResponse.data.puuid
     );
-    const matchDto = (
-      await this.#api.match.byMatchId(matchListResponse.data.matches[0].gameId)
-    ).data;
+    const matchId = matchIdsResponse.data[0];
+    return matchId;
+  }
+
+  private async getMatchDto(matchId: string): Promise<MatchDto> {
+    const matchDto = (await this.#api.match.byMatchId(matchId)).data;
 
     return matchDto;
   }
@@ -158,12 +163,12 @@ export class LeagueCharts {
     matchDto: MatchDto,
     populateSpriteSheet: (
       imageSpriteSheet: SpriteSheet,
-      participant: MatchDto["participants"][0]
+      participant: MatchDto["info"]["participants"][0]
     ) => Promise<void>
   ): Promise<SpriteSheet> {
     const imageSpriteSheet: SpriteSheet = {};
 
-    for (const participant of matchDto.participants) {
+    for (const participant of matchDto.info.participants) {
       await populateSpriteSheet(imageSpriteSheet, participant);
     }
 
@@ -213,14 +218,15 @@ export class LeagueCharts {
     "chartContext" | "summonerName" | "region" | "afterRender"
   >): Promise<Chart> {
     if (region) {
-      this.#api.setRegion(region);
+      this.#api.setPlatform(region);
     }
 
-    const matchDto = await this.getLastMatchDto(summonerName);
+    const matchId = await this.getLastMatchId(summonerName);
+    const matchDto = await this.getMatchDto(matchId);
 
     // get the data dragon version
     const dataDragonVersion = await this.#api.dataDragonVersion(
-      matchDto.gameVersion
+      matchDto.info.gameVersion
     );
 
     if (this.#lastDataDragonVersion !== dataDragonVersion) {
@@ -241,7 +247,7 @@ export class LeagueCharts {
       async (itemImageSpriteSheets, participant) => {
         if (this.#items) {
           for (let j = 0; j <= 6; j++) {
-            const itemId = participant.stats[`item${j}` as "item0"];
+            const itemId = participant[`item${j}` as "item0"];
 
             if (itemId) {
               const spriteId = this.#items.data[itemId]?.image.sprite;
@@ -274,7 +280,7 @@ export class LeagueCharts {
       async (summonerSpellSpriteSheets, participant) => {
         if (this.#summonerSpells) {
           for (let j = 1; j <= 2; j++) {
-            const spellId = participant[`spell${j}Id` as "spell1Id"];
+            const spellId = participant[`summoner${j}Id` as "summoner1Id"];
 
             if (spellId) {
               const spriteId = this.#summonerSpells.data[spellId]?.image.sprite;
@@ -306,17 +312,19 @@ export class LeagueCharts {
       matchDto,
       async (runeImages, participant) => {
         if (this.#runes) {
-          const runeId = participant.stats.perk0;
-          const runePath = this.#runes[runeId].icon;
-          const url = this.#api.runeImageUrl(runePath);
+          const runeId = this.#api.runeId(participant.perks);
+          if (runeId) {
+            const runePath = this.#runes[runeId].icon;
+            const url = this.#api.runeImageUrl(runePath);
 
-          if (!runeImages[runeId]) {
-            try {
-              runeImages[runeId] = await loadImage(url);
-            } catch (err) {
-              console.log(
-                `error loading image for rune [runeId:${runeId}] [url:${url}]`
-              );
+            if (!runeImages[runeId]) {
+              try {
+                runeImages[runeId] = await loadImage(url);
+              } catch (err) {
+                console.log(
+                  `error loading image for rune [runeId:${runeId}] [url:${url}]`
+                );
+              }
             }
           }
         }
@@ -349,20 +357,24 @@ export class LeagueCharts {
     const summonerSpellSize = 14;
     const middleGap = 45;
 
-    matchDto.participantIdentities.forEach((participantIdentity, i) => {
+    const infoDto = matchDto.info;
+
+    infoDto.participants.forEach((participant, i) => {
       const y = yStart + rowHeight * i + (i > 4 ? middleGap : 0);
 
       // draw the primary keystone (rune)
-      const runeId = matchDto.participants[i].stats.perk0;
-      const image = runeImages[runeId];
-      if (image) {
-        ctx.drawImage(image, xRune, y - rowHeight / 2, runeSize, runeSize);
+      const runeId = this.#api.runeId(infoDto.participants[i].perks);
+      if (runeId) {
+        const image = runeImages[runeId];
+        if (image) {
+          ctx.drawImage(image, xRune, y - rowHeight / 2, runeSize, runeSize);
+        }
       }
 
       // draw the summoner spells
       for (let j = 1; j <= 2; j++) {
         const summonerSpellId =
-          matchDto.participants[i][`spell${j}Id` as "spell1Id"];
+          infoDto.participants[i][`summoner${j}Id` as "summoner1Id"];
 
         // draw the yellow border around the summoner spell
         ctx.strokeColor = Colors.iconBorder;
@@ -400,15 +412,11 @@ export class LeagueCharts {
       // draw the champion level
       ctx.font = "14px Karla, sans-serif";
       ctx.fillStyle = Colors.primaryText;
-      ctx.fillText(
-        matchDto.participants[i].stats.champLevel,
-        xChampionLevel,
-        y
-      );
+      ctx.fillText(infoDto.participants[i].champLevel, xChampionLevel, y);
 
       // draw the champion images
       if (this.#champions) {
-        const imageDto = this.#champions[matchDto.participants[i].championId]
+        const imageDto = this.#champions[infoDto.participants[i].championId]
           ?.image;
 
         if (imageDto) {
@@ -432,11 +440,11 @@ export class LeagueCharts {
       // draw the summoner name
       ctx.font = "12px Rubik, sans-serif";
       ctx.fillStyle = Colors.secondaryText;
-      ctx.fillText(participantIdentity.player.summonerName, xSummonerName, y);
+      ctx.fillText(participant.summonerName, xSummonerName, y);
 
       // draw the items
       for (let j = 0; j <= 6; j++) {
-        const itemId = matchDto.participants[i].stats[`item${j}` as "item0"];
+        const itemId = infoDto.participants[i][`item${j}` as "item0"];
 
         // draw the yellow border around the item
         ctx.strokeStyle = Colors.iconBorder;
@@ -483,32 +491,31 @@ export class LeagueCharts {
     ctx.font = "12px Rubik, sans-serif";
     ctx.fillStyle = Colors.primaryText;
 
-    matchDto.participants.forEach((participant, i) => {
+    infoDto.participants.forEach((participant, i) => {
       const y = yStart + rowHeight * i + (i > 4 ? 40 : 0);
 
-      ctx.fillText(participant.stats.kills, xKda, y);
+      ctx.fillText(participant.kills, xKda, y);
       ctx.fillText("/", xKda + 25, y);
-      ctx.fillText(participant.stats.deaths, xKda + 45, y);
+      ctx.fillText(participant.deaths, xKda + 45, y);
       ctx.fillText("/", xKda + 69, y);
-      ctx.fillText(participant.stats.assists, xKda + 89, y);
+      ctx.fillText(participant.assists, xKda + 89, y);
       ctx.fillText(
-        participant.stats.totalMinionsKilled +
-          participant.stats.neutralMinionsKilled,
+        participant.totalMinionsKilled + participant.neutralMinionsKilled,
         xCsScore,
         y
       );
-      ctx.fillText(commaNumber(participant.stats.goldEarned), xGold, y);
+      ctx.fillText(commaNumber(participant.goldEarned), xGold, y);
 
       if (i < 5) {
-        team1Kills += participant.stats.kills;
-        team1Deaths += participant.stats.deaths;
-        team1Assists += participant.stats.assists;
-        team1Gold += participant.stats.goldEarned;
+        team1Kills += participant.kills;
+        team1Deaths += participant.deaths;
+        team1Assists += participant.assists;
+        team1Gold += participant.goldEarned;
       } else {
-        team2Kills += participant.stats.kills;
-        team2Deaths += participant.stats.deaths;
-        team2Assists += participant.stats.assists;
-        team2Gold += participant.stats.goldEarned;
+        team2Kills += participant.kills;
+        team2Deaths += participant.deaths;
+        team2Assists += participant.assists;
+        team2Gold += participant.goldEarned;
       }
     });
 
@@ -559,15 +566,16 @@ export class LeagueCharts {
     afterRender,
     chartStat,
   }: FunctionParams & {
-    chartStat: keyof ParticipantStatsDto;
+    chartStat: BarChartStat;
   }): Promise<Chart> {
     if (region) {
-      this.#api.setRegion(region);
+      this.#api.setPlatform(region);
     }
 
-    const matchDto = await this.getLastMatchDto(summonerName);
+    const matchId = await this.getLastMatchId(summonerName);
+    const matchDto = await this.getMatchDto(matchId);
     const dataDragonVersion = await this.#api.dataDragonVersion(
-      matchDto.gameVersion
+      matchDto.info.gameVersion
     );
 
     if (this.#lastDataDragonVersion !== dataDragonVersion) {
@@ -581,10 +589,10 @@ export class LeagueCharts {
     const data: ChartData = {
       datasets: [
         {
-          data: matchDto.participants.map((participant) => {
+          data: matchDto.info.participants.map((participant) => {
             // maybe only allow chartStat to be a type that makes value a number
             // or make an explicit list of certain properties instead of any stat
-            const value = participant.stats[chartStat];
+            const value = participant[chartStat];
             if (value !== undefined && value > max) {
               max = value;
             }
@@ -600,8 +608,8 @@ export class LeagueCharts {
           label: undefined,
         },
       ],
-      labels: matchDto.participantIdentities.map(
-        (identity) => identity.player.summonerName
+      labels: matchDto.info.participants.map(
+        (participant) => participant.summonerName
       ),
     };
 
@@ -658,7 +666,7 @@ export class LeagueCharts {
 
             if (this.#champions) {
               const imageDto = this.#champions[
-                matchDto.participants[index].championId
+                matchDto.info.participants[index].championId
               ]?.image;
 
               if (imageDto) {
@@ -719,13 +727,14 @@ export class LeagueCharts {
     >;
   }): Promise<Chart> {
     if (region) {
-      this.#api.setRegion(region);
+      this.#api.setPlatform(region);
     }
 
-    const matchDto = await this.getLastMatchDto(summonerName);
+    const matchId = await this.getLastMatchId(summonerName);
+    const matchDto = await this.getMatchDto(matchId);
     let timelineResponse;
     try {
-      timelineResponse = await this.#api.timeline.byMatchId(matchDto.gameId);
+      timelineResponse = await this.#api.timeline.byMatchId(matchId);
     } catch (error) {
       console.log("error", error);
     }
@@ -735,11 +744,10 @@ export class LeagueCharts {
     let max = 0;
 
     const summonerParticipantId =
-      matchDto.participantIdentities.find(
-        (particiantIdentity) =>
-          particiantIdentity.player.summonerName
-            .toLowerCase()
-            .replace(/ /g, "") === summonerName.toLowerCase().replace(/ /g, "")
+      matchDto.info.participants.find(
+        (participant) =>
+          participant.summonerName.toLowerCase().replace(/ /g, "") ===
+          summonerName.toLowerCase().replace(/ /g, "")
       )?.participantId ?? 1;
 
     // as in the top part of the chart, the positive numbers, the blue
@@ -751,7 +759,7 @@ export class LeagueCharts {
       }
     }
 
-    timeline?.frames.forEach((frame) => {
+    timeline?.info.frames.forEach((frame) => {
       const gold = Object.values(frame.participantFrames).reduce<number>(
         (total, participantFrame) => {
           if (isTopTeam(participantFrame.participantId)) {
@@ -762,8 +770,11 @@ export class LeagueCharts {
         },
         0
       );
+
+      // the final frame is the end of the game, so it probably won't be on a minute exactly
+      const parsedTimestamp = parseMilliseconds(frame.timestamp);
       goldDataPoints.push({
-        x: Math.floor(frame.timestamp / 1000 / 60),
+        x: parsedTimestamp.minutes * 60 + parsedTimestamp.seconds,
         y: gold,
       });
 
@@ -789,7 +800,6 @@ export class LeagueCharts {
           borderColor: "rgba(40, 40, 40, 0.7)",
         },
       ],
-      labels: goldDataPoints.map((val) => val.x ?? ""),
     };
     const options: ChartOptions = {
       legend: {
@@ -809,6 +819,20 @@ export class LeagueCharts {
           chartStat === "totalGold" ? "gold" : chartStat
         )} Advantage`,
       },
+      tooltips: {
+        callbacks: {
+          label: (item) => {
+            return item.value ?? "";
+          },
+          title: (items) => {
+            const parsed = parseMilliseconds(Number(items[0].label) * 1000);
+            return `${parsed.minutes}:${String(parsed.seconds).padStart(
+              2,
+              "0"
+            )}`;
+          },
+        },
+      },
       scales: {
         xAxes: [
           {
@@ -820,10 +844,15 @@ export class LeagueCharts {
               // doing the mod here instead of using stepSize because otherwise it
               // would show the last number as well even if it wasn't divisible by 5
               callback: (value) =>
-                Number(value) % 5 === 0 ? `${value}:00` : "",
+                (Number(value) / 60) % 5 === 0
+                  ? `${Number(value) / 60}:00`
+                  : "",
+              stepSize: 60,
               min: 0,
-              max: goldDataPoints.length - 1,
+              max: goldDataPoints[goldDataPoints.length - 1].x,
               autoSkip: false,
+              maxRotation: 0,
+              minRotation: 0,
             },
           },
         ],
