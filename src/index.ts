@@ -183,8 +183,8 @@ export class LeagueCharts {
       matchDto,
       async (championImageSpriteSheets, participant) => {
         if (this.#champions) {
-          const spriteId = this.#champions[participant.championId]?.image
-            .sprite;
+          const spriteId =
+            this.#champions[participant.championId]?.image.sprite;
 
           if (spriteId) {
             const url = this.#api.championImageSpriteSheetUrl(
@@ -416,8 +416,8 @@ export class LeagueCharts {
 
       // draw the champion images
       if (this.#champions) {
-        const imageDto = this.#champions[infoDto.participants[i].championId]
-          ?.image;
+        const imageDto =
+          this.#champions[infoDto.participants[i].championId]?.image;
 
         if (imageDto) {
           const image = championImageSpriteSheets[imageDto.sprite];
@@ -599,9 +599,9 @@ export class LeagueCharts {
             return value ?? 0;
           }),
           backgroundColor: (({ dataIndex = 0 }) =>
-            dataIndex < 5 ? Colors.lightBlue : Colors.lightRed) as Scriptable<
-            ChartColor
-          >,
+            dataIndex < 5
+              ? Colors.lightBlue
+              : Colors.lightRed) as Scriptable<ChartColor>,
           borderColor: (({ dataIndex = 0 }) =>
             dataIndex < 5 ? Colors.blue : Colors.red) as Scriptable<ChartColor>,
           borderWidth: 1,
@@ -653,10 +653,8 @@ export class LeagueCharts {
     const plugins: PluginServiceRegistrationOptions[] = [
       {
         afterRender: async (chart) => {
-          const championImageSpriteSheets = await this.championImageSpriteSheets(
-            matchDto,
-            dataDragonVersion
-          );
+          const championImageSpriteSheets =
+            await this.championImageSpriteSheets(matchDto, dataDragonVersion);
 
           const IMAGE_SIZE = 24;
 
@@ -665,9 +663,9 @@ export class LeagueCharts {
             const y = yAxis.getPixelForTick(index);
 
             if (this.#champions) {
-              const imageDto = this.#champions[
-                matchDto.info.participants[index].championId
-              ]?.image;
+              const imageDto =
+                this.#champions[matchDto.info.participants[index].championId]
+                  ?.image;
 
               if (imageDto) {
                 const image = championImageSpriteSheets[imageDto.sprite];
