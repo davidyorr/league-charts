@@ -1,5 +1,5 @@
 describe("charts", () => {
-  const timeout = 8000;
+  const timeout = 12000;
   it("bar chart", () => {
     cy.visit(
       `public/storybook/iframe.html?id=bar-charts--story&viewMode=story`

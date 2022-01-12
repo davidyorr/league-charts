@@ -1,5 +1,5 @@
-import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { IAxiosCacheAdapterOptions, setupCache } from "axios-cache-adapter";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 // Summoner
 // ----------------
@@ -18,49 +18,30 @@ type SummonerDto = {
 // ----------------
 
 export type MatchDto = {
-  gameId: number;
-  participantIdentities: ParticipantIdentityDto[];
-  queueId: number;
-  gameType: string;
-  gameDuration: number;
-  teams: any;
-  platformId: string;
-  gameCreation: number;
-  seasonId: number;
-  gameVersion: string;
-  MapId: number;
-  gameMode: string;
-  participants: ParticipantDto[];
-};
-
-type ParticipantIdentityDto = {
-  participantId: number;
-  player: PlayerDto;
-};
-
-type PlayerDto = {
-  profileIcon: number;
-  accountId: string;
-  matchHistoryUri: string;
-  currentAccountId: string;
-  currentPlatformId: string;
-  summonerName: string;
-  summonerId: string;
-  platformId: string;
+  metadata: {
+    dataVersion: string;
+    matchId: string;
+    participants: Array<string>;
+  };
+  info: {
+    gameId: number;
+    queueId: number;
+    gameType: string;
+    gameDuration: number;
+    teams: any;
+    platformId: string;
+    gameCreation: number;
+    seasonId: number;
+    gameVersion: string;
+    MapId: number;
+    gameMode: string;
+    participants: ParticipantDto[];
+  };
 };
 
 type ParticipantDto = {
   participantId: number;
   championId: number;
-  stats: ParticipantStatsDto;
-  teamId: number;
-  timeline: any;
-  spell1Id: number;
-  spell2Id: number;
-  highestAchievedSeasonTier: string;
-};
-
-export type ParticipantStatsDto = {
   item0?: number;
   item1?: number;
   item2?: number;
@@ -97,36 +78,48 @@ export type ParticipantStatsDto = {
   kills: number;
   assists: number;
   visionScore: number;
-  perk0: number; // rune
+  // rune
+  perks: {
+    statPerks: {
+      defense: number;
+      flex: number;
+      offense: number;
+    };
+    styles: Array<{
+      description: string;
+      selections: Array<{
+        perk: number;
+        var1: number;
+        var2: number;
+        var3: number;
+      }>;
+      style: number;
+    }>;
+  };
+  teamId: number;
+  summoner1Id: number;
+  summoner2Id: number;
+  profileIcon: number;
+  summonerName: string;
+  summonerId: string;
+  highestAchievedSeasonTier: string;
 };
 
-// Match List
-// ----------------
-
-type MatchReferenceDto = {
-  gameId: number;
-  role: string;
-  season: number;
-  platformId: string;
-  champion: number;
-  queue: number;
-  lane: string;
-  timestamp: number;
-};
-
-type MatchListDto = {
-  startIndex: number;
-  totalGames: number;
-  endIndex: number;
-  matches: MatchReferenceDto[];
-};
+type MatchId = string; // for example "NA1_4136640228"
 
 // Timelines
 // ----------------
 
 type MatchTimelineDto = {
-  frames: MatchFrameDto[];
-  frameInterval: number;
+  metadata: {
+    dataVersion: string;
+    matchId: string;
+    participants: Array<string>;
+  };
+  info: {
+    frames: MatchFrameDto[];
+    frameInterval: number;
+  };
 };
 
 type MatchFrameDto = {
@@ -329,10 +322,42 @@ export type RuneMap = {
 };
 
 const X_RIOT_TOKEN_HEADER = "X-Riot-Token";
+// given the platform routes (NA1, BR1, KR...) get the regional routes
+const PLATFORM_TO_REGION_MAP: {
+  [key in Platform]: Region;
+} = {
+  BR1: "AMERICAS",
+  EUN1: "EUROPE",
+  EUW1: "EUROPE",
+  JP1: "ASIA",
+  KR: "ASIA",
+  LA1: "AMERICAS",
+  LA2: "AMERICAS",
+  NA1: "AMERICAS",
+  OC1: "AMERICAS",
+  RU: "ASIA",
+  TR1: "ASIA",
+};
+
+type Platform =
+  | "BR1"
+  | "EUN1"
+  | "EUW1"
+  | "JP1"
+  | "KR"
+  | "LA1"
+  | "LA2"
+  | "NA1"
+  | "OC1"
+  | "RU"
+  | "TR1";
+
+type Region = "AMERICAS" | "ASIA" | "EUROPE";
 
 export class Api {
   #riotInstance: AxiosInstance;
   #dataDragonInstance: AxiosInstance;
+  #platform: Platform;
 
   constructor(apiKey: string, cacheOptions?: IAxiosCacheAdapterOptions) {
     const cache = cacheOptions
@@ -344,9 +369,10 @@ export class Api {
         })
       : undefined;
 
+    // some calls take regions like NA1, BR1, KR...
+    // some take regions AMERICAS, ASIA, EUROPE
     this.#riotInstance = axios.create({
       adapter: cache?.adapter,
-      baseURL: "https://na1.api.riotgames.com/lol/",
       headers: {
         [X_RIOT_TOKEN_HEADER]: apiKey,
       },
@@ -354,10 +380,20 @@ export class Api {
     this.#dataDragonInstance = axios.create({
       baseURL: "https://ddragon.leagueoflegends.com/",
     });
+    this.#platform = "NA1";
   }
 
-  setRegion = (region: string): void => {
-    this.#riotInstance.defaults.baseURL = `https://${region.toLowerCase()}.api.riotgames.com/lol/`;
+  // whether to use the platform or regional route
+  #getBaseRiotUrl = (type: "PLATFORM" | "REGIONAL" = "PLATFORM"): string => {
+    return `https://${
+      type === "PLATFORM"
+        ? this.#platform.toLowerCase()
+        : PLATFORM_TO_REGION_MAP[this.#platform].toLowerCase()
+    }.api.riotgames.com/lol`;
+  };
+
+  setPlatform = (platform: Platform): void => {
+    this.#platform = platform;
   };
 
   dataDragonVersion = async (gameVersion: string): Promise<string> => {
@@ -517,32 +553,47 @@ export class Api {
     return `${this.#dataDragonInstance.defaults.baseURL}cdn/img/${imagePath}`;
   };
 
+  runeId = (
+    perks: MatchDto["info"]["participants"][0]["perks"]
+  ): number | undefined => {
+    return perks.styles.find((style) => style.description === "primaryStyle")
+      ?.selections[0].perk;
+  };
+
   summoner = {
     byName: (summonerName: string): Promise<AxiosResponse<SummonerDto>> => {
       return this.#riotInstance.get<SummonerDto>(
-        `summoner/v4/summoners/by-name/${encodeURI(summonerName)}`
+        `${this.#getBaseRiotUrl()}/summoner/v4/summoners/by-name/${encodeURI(
+          summonerName
+        )}`
       );
     },
   };
 
   match = {
-    byMatchId: (matchId: number): Promise<AxiosResponse<MatchDto>> => {
-      return this.#riotInstance.get<MatchDto>(`match/v4/matches/${matchId}`);
+    byMatchId: (matchId: string): Promise<AxiosResponse<MatchDto>> => {
+      return this.#riotInstance.get<MatchDto>(
+        `${this.#getBaseRiotUrl("REGIONAL")}/match/v5/matches/${matchId}`
+      );
     },
   };
 
-  matchList = {
-    byAccountId: (accountId: string): Promise<AxiosResponse<MatchListDto>> => {
-      return this.#riotInstance.get<MatchListDto>(
-        `match/v4/matchlists/by-account/${accountId}?endIndex=1`
+  matchIds = {
+    byPuuid: (puuid: string): Promise<AxiosResponse<Array<MatchId>>> => {
+      return this.#riotInstance.get<Array<MatchId>>(
+        `${this.#getBaseRiotUrl(
+          "REGIONAL"
+        )}/match/v5/matches/by-puuid/${puuid}/ids?count=1`
       );
     },
   };
 
   timeline = {
-    byMatchId: (matchId: number): Promise<AxiosResponse<MatchTimelineDto>> => {
+    byMatchId: (matchId: string): Promise<AxiosResponse<MatchTimelineDto>> => {
       return this.#riotInstance.get<MatchTimelineDto>(
-        `match/v4/timelines/by-match/${matchId}?endIndex=1`
+        `${this.#getBaseRiotUrl(
+          "REGIONAL"
+        )}/match/v5/matches/${matchId}/timeline`
       );
     },
   };

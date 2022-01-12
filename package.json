@@ -49,6 +49,7 @@
     "axios-cache-adapter": "^2.7.0",
     "canvas": "^2.6.1",
     "chart.js": "^2.9.3",
-    "comma-number": "^2.0.1"
+    "comma-number": "^2.0.1",
+    "parse-ms": "^3.0.0"
   }
 }

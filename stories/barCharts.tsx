@@ -1,10 +1,9 @@
-import { LeagueCharts } from "../src/index";
+import { BarChartStat, LeagueCharts } from "../src/index";
 import MockAdapter from "axios-mock-adapter";
-import { ParticipantStatsDto } from "../src/api/index";
 import React from "react";
 import axios from "axios";
 import { matchDto } from "./mock/match";
-import { matchListDto } from "./mock/match-list";
+import { matchIds } from "./mock/match-list";
 import { summonerDto } from "./mock/summoner";
 import { useEffect } from "@storybook/client-api";
 
@@ -16,19 +15,21 @@ mock
   )
   .reply(200, summonerDto)
   .onGet(
-    "https://na1.api.riotgames.com/lol/match/v4/matchlists/by-account/th9QQeUUH1ZBtWckQpcnFcq9DG30jdyl-Qy3hTbdIOzA4c2ssG8k0Wvm?endIndex=1"
+    "https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/fkqfvV7L5LRjJNZzfZOwwh4EdGKwspVeFBh1iMc2cuEx_CPvtQgKDRi7d9AITQYiAXBdpEwSvXSlTg/ids?count=1"
   )
-  .reply(200, matchListDto)
-  .onGet("https://na1.api.riotgames.com/lol/match/v4/matches/3590307953")
+  .reply(200, matchIds)
+  .onGet(
+    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4128286830"
+  )
   .reply(200, matchDto)
   .onAny()
   .passThrough();
 
 export const Story: {
   args: {
-    stat: keyof ParticipantStatsDto;
+    stat: BarChartStat;
   };
-} = ({ stat }: { stat: keyof ParticipantStatsDto }) => {
+} = ({ stat }: { stat: BarChartStat }) => {
   useEffect(() => {
     const leagueCharts = new LeagueCharts("api key");
     leagueCharts.barChart({
@@ -53,35 +54,9 @@ Story.args = {
 };
 
 const options: {
-  [stat in keyof ParticipantStatsDto]: any;
+  [stat in BarChartStat]: any;
 } = {
-  totalUnitsHealed: 0,
-  largestMultiKill: 0,
-  goldEarned: 0,
-  physicalDamageTaken: 0,
-  totalPlayerScore: 0,
-  champLevel: 0,
-  damageDealtToObjectives: 0,
-  totalDamageTaken: 0,
-  neutralMinionsKilled: 0,
-  deaths: 0,
-  tripleKills: 0,
-  magicDamageDealtToChampions: 0,
-  wardsKilled: 0,
-  pentaKills: 0,
-  damageSelfMitigated: 0,
-  largestCriticalStrike: 0,
-  totalTimeCrowdControlDealt: 0,
-  magicDamageDealt: 0,
-  wardsPlaced: 0,
-  totalDamageDealt: 0,
-  timeCCingOthers: 0,
-  largestKillingSpree: 0,
   totalDamageDealtToChampions: 0,
-  physicalDamageDealtToChampions: 0,
-  neutralMinionsKilledTeamJungle: 0,
-  totalMinionsKilled: 0,
-  visionScore: 0,
 };
 
 export default {
