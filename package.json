@@ -51,6 +51,6 @@
     "canvas": "^2.8.0",
     "chart.js": "^2.9.4",
     "comma-number": "^2.0.1",
-    "parse-ms": "^3.0.0"
+    "parse-ms": "^2.0.1"
   }
 }
