@@ -33,6 +33,7 @@
     "@typescript-eslint/eslint-plugin": "^4.4.0",
     "@typescript-eslint/parser": "^4.4.0",
     "axios-mock-adapter": "^1.20.0",
+    "chart.js": "^2.9.4",
     "concurrently": "^7.0.0",
     "copyfiles": "^2.4.1",
     "cypress": "^9.2.1",
@@ -49,8 +50,10 @@
     "axios": "^0.24.0",
     "axios-cache-adapter": "^2.7.3",
     "canvas": "^2.8.0",
-    "chart.js": "^2.9.4",
     "comma-number": "^2.0.1",
     "parse-ms": "^2.0.1"
+  },
+  "peerDependencies": {
+    "chart.js": "^2.9.4"
   }
 }
