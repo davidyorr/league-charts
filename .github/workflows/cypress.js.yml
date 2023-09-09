@@ -19,9 +19,9 @@ jobs:
           node-version: 12
       - name: install, build storybook, and run cypress tests
         run: |
-          yarn install
-          yarn storybook:build
-          yarn cypress
+          pnpm install
+          pnpm run storybook:build
+          pnpm run cypress
       - name: Archive code coverage results
         uses: actions/upload-artifact@v2
         if: ${{ failure() }}
