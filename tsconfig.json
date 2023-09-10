@@ -1,11 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es2019",
-    "module": "commonjs",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "outDir": "./dist",
-    "lib": ["es2019", "DOM"],
-    "types": ["node", "@types/css-font-loading-module"],
-    "typeRoots": ["node_modules/@types","types"],
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
     "strict": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
@@ -17,5 +19,8 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true
   },
-  "include": ["./src", "./types/**/*.d.ts"]
+  "include": [
+    "./src",
+    "./types/**/*.d.ts"
+  ]
 }

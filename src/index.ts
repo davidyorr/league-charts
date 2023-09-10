@@ -33,17 +33,17 @@ type FunctionParams = {
   chartContext: any;
   summonerName: string;
   region?:
-    | "BR1"
-    | "EUN1"
-    | "EUW1"
-    | "JP1"
-    | "KR"
-    | "LA1"
-    | "LA2"
-    | "NA1"
-    | "OC1"
-    | "RU"
-    | "TR1";
+  | "BR1"
+  | "EUN1"
+  | "EUW1"
+  | "JP1"
+  | "KR"
+  | "LA1"
+  | "LA2"
+  | "NA1"
+  | "OC1"
+  | "RU"
+  | "TR1";
   chartOptions?: ChartOptions;
   chartPlugins?: PluginServiceRegistrationOptions[];
   afterRender?: () => void;
@@ -150,11 +150,11 @@ export class LeagueCharts {
       await loadFont(
         new FontFace(
           "Rubik",
-          `url(${require("./assets/RubikLightRegular.ttf")})`
+          `url(${new URL("./assets/RubikLightRegular.ttf", import.meta.url).toString()})`
         )
       );
       await loadFont(
-        new FontFace("Karla", `url(${require("./assets/KarlaBold.ttf")})`)
+        new FontFace("Karla", `url(${new URL("./assets/KarlaBold.ttf", import.meta.url).toString()})`)
       );
     }
   }
