@@ -31,19 +31,21 @@ type SpriteSheet = {
 
 type FunctionParams = {
   chartContext: any;
-  summonerName: string;
+  gameName: string;
+  // use the defaulted region tag line if none provided
+  tagLine?: string;
   region?:
-  | "BR1"
-  | "EUN1"
-  | "EUW1"
-  | "JP1"
-  | "KR"
-  | "LA1"
-  | "LA2"
-  | "NA1"
-  | "OC1"
-  | "RU"
-  | "TR1";
+    | "BR1"
+    | "EUN1"
+    | "EUW1"
+    | "JP1"
+    | "KR"
+    | "LA1"
+    | "LA2"
+    | "NA1"
+    | "OC1"
+    | "RU"
+    | "TR1";
   chartOptions?: ChartOptions;
   chartPlugins?: PluginServiceRegistrationOptions[];
   afterRender?: () => void;
@@ -82,10 +84,13 @@ export class LeagueCharts {
     }
   }
 
-  private async getLastMatchId(summonerName: string): Promise<string> {
-    const summonerResponse = await this.#api.summoner.byName(summonerName);
+  private async getLastMatchId(
+    gameName: string,
+    tagLine: string
+  ): Promise<string> {
+    const accountResponse = await this.#api.account.byRiotId(gameName, tagLine);
     const matchIdsResponse = await this.#api.matchIds.byPuuid(
-      summonerResponse.data.puuid
+      accountResponse.data.puuid
     );
     const matchId = matchIdsResponse.data[0];
     return matchId;
@@ -150,11 +155,20 @@ export class LeagueCharts {
       await loadFont(
         new FontFace(
           "Rubik",
-          `url(${new URL("./assets/RubikLightRegular.ttf", import.meta.url).toString()})`
+          `url(${new URL(
+            "./assets/RubikLightRegular.ttf",
+            import.meta.url
+          ).toString()})`
         )
       );
       await loadFont(
-        new FontFace("Karla", `url(${new URL("./assets/KarlaBold.ttf", import.meta.url).toString()})`)
+        new FontFace(
+          "Karla",
+          `url(${new URL(
+            "./assets/KarlaBold.ttf",
+            import.meta.url
+          ).toString()})`
+        )
       );
     }
   }
@@ -210,18 +224,22 @@ export class LeagueCharts {
 
   async scoreboard({
     chartContext,
-    summonerName,
+    gameName,
+    tagLine,
     region,
     afterRender,
   }: Pick<
     FunctionParams,
-    "chartContext" | "summonerName" | "region" | "afterRender"
+    "chartContext" | "gameName" | "tagLine" | "region" | "afterRender"
   >): Promise<Chart> {
     if (region) {
       this.#api.setPlatform(region);
     }
 
-    const matchId = await this.getLastMatchId(summonerName);
+    const matchId = await this.getLastMatchId(
+      gameName,
+      tagLine ?? region ?? "NA1"
+    );
     const matchDto = await this.getMatchDto(matchId);
 
     // get the data dragon version
@@ -559,7 +577,8 @@ export class LeagueCharts {
 
   async barChart({
     chartContext,
-    summonerName,
+    gameName,
+    tagLine,
     region,
     chartOptions,
     chartPlugins,
@@ -572,7 +591,10 @@ export class LeagueCharts {
       this.#api.setPlatform(region);
     }
 
-    const matchId = await this.getLastMatchId(summonerName);
+    const matchId = await this.getLastMatchId(
+      gameName,
+      tagLine ?? region ?? "NA1"
+    );
     const matchDto = await this.getMatchDto(matchId);
     const dataDragonVersion = await this.#api.dataDragonVersion(
       matchDto.info.gameVersion
@@ -712,7 +734,8 @@ export class LeagueCharts {
 
   async lineChart({
     chartContext,
-    summonerName,
+    gameName,
+    tagLine,
     region,
     chartOptions,
     chartPlugins,
@@ -728,7 +751,10 @@ export class LeagueCharts {
       this.#api.setPlatform(region);
     }
 
-    const matchId = await this.getLastMatchId(summonerName);
+    const matchId = await this.getLastMatchId(
+      gameName,
+      tagLine ?? region ?? "NA1"
+    );
     const matchDto = await this.getMatchDto(matchId);
     let timelineResponse;
     try {
@@ -744,8 +770,9 @@ export class LeagueCharts {
     const summonerParticipantId =
       matchDto.info.participants.find(
         (participant) =>
-          participant.summonerName.toLowerCase().replace(/ /g, "") ===
-          summonerName.toLowerCase().replace(/ /g, "")
+          (participant.riotIdGameName ?? participant.summonerName)
+            .toLowerCase()
+            .replace(/ /g, "") === gameName.toLowerCase().replace(/ /g, "")
       )?.participantId ?? 1;
 
     // as in the top part of the chart, the positive numbers, the blue

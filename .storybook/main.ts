@@ -1,5 +1,5 @@
 import type { StorybookConfig } from "@storybook/react-vite";
-import { defineConfig, mergeConfig } from 'vite';
+import { defineConfig, mergeConfig } from "vite";
 
 const config: StorybookConfig = {
   stories: ["../stories/**/*.stories.@(js|jsx|ts|tsx)"],
@@ -7,22 +7,25 @@ const config: StorybookConfig = {
 
   framework: {
     name: "@storybook/react-vite",
-    options: {}
+    options: {},
   },
 
   docs: {
-    autodocs: false
+    autodocs: false,
   },
   async viteFinal(config) {
-    return mergeConfig(config, defineConfig({
-      server: {
-        hmr: {
-          protocol: 'ws',
-          port: 6006
-        }
-      }
-    }))
-  }
+    return mergeConfig(
+      config,
+      defineConfig({
+        server: {
+          hmr: {
+            protocol: "ws",
+            port: 6006,
+          },
+        },
+      })
+    );
+  },
 };
 
 export default config;

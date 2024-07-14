@@ -1,17 +1,16 @@
 import { IAxiosCacheAdapterOptions, setupCache } from "axios-cache-adapter";
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 
-// Summoner
+// Account
 // ----------------
 
-type SummonerDto = {
-  accountId: string;
-  profileIconId: number;
-  revisionDate: number;
-  name: string;
-  id: string;
+type AccountDto = {
   puuid: string;
-  summonerLevel: number;
+  // Riot IDs are a combination of "game name" + "tag line".
+  // "NA1" is the default for league accounts created before the
+  // "Summoner Names to Riot IDs" switch.
+  gameName?: string;
+  tagLine?: string;
 };
 
 // Match
@@ -97,6 +96,7 @@ type ParticipantDto = {
     }>;
   };
   teamId: number;
+  riotIdGameName: string;
   summoner1Id: number;
   summoner2Id: number;
   profileIcon: number;
@@ -384,12 +384,19 @@ export class Api {
   }
 
   // whether to use the platform or regional route
-  #getBaseRiotUrl = (type: "PLATFORM" | "REGIONAL" = "PLATFORM"): string => {
+  #getBaseRiotUrl = ({
+    type = "PLATFORM",
+    // either the game name ("lol"), or "riot"
+    gameOrRiot = "lol",
+  }: {
+    type?: "PLATFORM" | "REGIONAL";
+    gameOrRiot?: "lol" | "riot";
+  } = {}): string => {
     return `https://${
       type === "PLATFORM"
         ? this.#platform.toLowerCase()
         : PLATFORM_TO_REGION_MAP[this.#platform].toLowerCase()
-    }.api.riotgames.com/lol`;
+    }.api.riotgames.com/${gameOrRiot}`;
   };
 
   setPlatform = (platform: Platform): void => {
@@ -560,12 +567,16 @@ export class Api {
       ?.selections[0].perk;
   };
 
-  summoner = {
-    byName: (summonerName: string): Promise<AxiosResponse<SummonerDto>> => {
-      return this.#riotInstance.get<SummonerDto>(
-        `${this.#getBaseRiotUrl()}/summoner/v4/summoners/by-name/${encodeURI(
-          summonerName
-        )}`
+  account = {
+    byRiotId: (
+      gameName: string,
+      tagLine: string
+    ): Promise<AxiosResponse<AccountDto>> => {
+      return this.#riotInstance.get<AccountDto>(
+        `${this.#getBaseRiotUrl({
+          type: "REGIONAL",
+          gameOrRiot: "riot",
+        })}/account/v1/accounts/by-riot-id/${gameName}/${tagLine}`
       );
     },
   };
@@ -573,7 +584,9 @@ export class Api {
   match = {
     byMatchId: (matchId: string): Promise<AxiosResponse<MatchDto>> => {
       return this.#riotInstance.get<MatchDto>(
-        `${this.#getBaseRiotUrl("REGIONAL")}/match/v5/matches/${matchId}`
+        `${this.#getBaseRiotUrl({
+          type: "REGIONAL",
+        })}/match/v5/matches/${matchId}`
       );
     },
   };
@@ -581,9 +594,9 @@ export class Api {
   matchIds = {
     byPuuid: (puuid: string): Promise<AxiosResponse<Array<MatchId>>> => {
       return this.#riotInstance.get<Array<MatchId>>(
-        `${this.#getBaseRiotUrl(
-          "REGIONAL"
-        )}/match/v5/matches/by-puuid/${puuid}/ids?count=1`
+        `${this.#getBaseRiotUrl({
+          type: "REGIONAL",
+        })}/match/v5/matches/by-puuid/${puuid}/ids?count=1`
       );
     },
   };
@@ -591,9 +604,9 @@ export class Api {
   timeline = {
     byMatchId: (matchId: string): Promise<AxiosResponse<MatchTimelineDto>> => {
       return this.#riotInstance.get<MatchTimelineDto>(
-        `${this.#getBaseRiotUrl(
-          "REGIONAL"
-        )}/match/v5/matches/${matchId}/timeline`
+        `${this.#getBaseRiotUrl({
+          type: "REGIONAL",
+        })}/match/v5/matches/${matchId}/timeline`
       );
     },
   };
