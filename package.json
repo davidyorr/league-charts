@@ -3,6 +3,8 @@
   "version": "3.0.0",
   "description": "league charts",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.esm.js",
   "repository": "git@github.com:davidyorr/league-charts.git",
   "author": "David Orr <davidyorr@gmail.com>",
   "license": "MIT",
@@ -11,8 +13,10 @@
     "README.md"
   ],
   "scripts": {
+    "clean": "rm -rf dist",
+    "prepack": "pnpm build",
     "copy-assets": "copyfiles --flat src/assets/**/* dist/assets",
-    "build": "pnpm tsc --extendedDiagnostics",
+    "build": "pnpm clean && rollup --config",
     "postbuild": "pnpm run copy-assets",
     "prestorybook": "pnpm run copy-assets",
     "prestorybook:build": "pnpm run copy-assets",
@@ -23,6 +27,7 @@
     "cypress": "cypress run"
   },
   "devDependencies": {
+    "@rollup/plugin-typescript": "11.1.6",
     "@storybook/addon-backgrounds": "7.4.0",
     "@storybook/addon-controls": "7.4.0",
     "@storybook/client-api": "7.4.0",
@@ -32,8 +37,8 @@
     "@types/cypress-image-snapshot": "3.1.6",
     "@types/node": "14.11.4",
     "@types/react": "17.0.2",
-    "@typescript-eslint/eslint-plugin": "4.4.0",
-    "@typescript-eslint/parser": "4.4.0",
+    "@typescript-eslint/eslint-plugin": "7.16.0",
+    "@typescript-eslint/parser": "7.16.0",
     "axios-mock-adapter": "1.20.0",
     "chart.js": "2.9.4",
     "concurrently": "7.0.0",
@@ -46,6 +51,7 @@
     "prettier": "2.5.1",
     "react": "17.0.2",
     "react-dom": "17.0.2",
+    "rollup": "4.18.1",
     "storybook": "7.4.0",
     "typescript": "5.2.2",
     "vite": "4.4.9"
