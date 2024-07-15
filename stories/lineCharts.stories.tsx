@@ -5,7 +5,7 @@ import React from "react";
 import axios from "axios";
 import { matchDto } from "./mock/match";
 import { matchIds } from "./mock/match-list";
-import { summonerDto } from "./mock/summoner";
+import { accountDto } from "./mock/account";
 import { timelineDto } from "./mock/timeline";
 import { useEffect } from "@storybook/client-api";
 
@@ -13,19 +13,19 @@ const mock = new MockAdapter(axios);
 mock.reset();
 mock
   .onGet(
-    "https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/AudreyRuston"
+    "https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/AudreyRuston/NA1"
   )
-  .reply(200, summonerDto)
+  .reply(200, accountDto)
   .onGet(
     "https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/fkqfvV7L5LRjJNZzfZOwwh4EdGKwspVeFBh1iMc2cuEx_CPvtQgKDRi7d9AITQYiAXBdpEwSvXSlTg/ids?count=1"
   )
   .reply(200, matchIds)
   .onGet(
-    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4128286830"
+    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4944360943"
   )
   .reply(200, matchDto)
   .onGet(
-    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4128286830/timeline"
+    "https://americas.api.riotgames.com/lol/match/v5/matches/NA1_4944360943/timeline"
   )
   .reply(200, timelineDto)
   .onAny()
@@ -45,7 +45,8 @@ export const Story: {
     leagueCharts.lineChart({
       chartStat: stat,
       chartContext: document.getElementById("line-chart"),
-      summonerName: "AudreyRuston",
+      gameName: "AudreyRuston",
+      tagLine: "NA1",
       chartOptions: {
         responsive: false,
       },

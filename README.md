@@ -19,7 +19,8 @@ const leagueCharts = new LeagueCharts("riot-api-key");
 leagueCharts.barChart({
   chartStat: "totalDamageDealtToChampions",
   chartContext: document.getElementById("champion-damage-chart"),
-  summonerName: "AudreyRuston",
+  gameName: "AudreyRuston",
+  tagLine: "NA1",
   chartOptions: {
     responsive: false,
   },
@@ -37,7 +38,8 @@ const leagueCharts = new LeagueCharts("riot-api-key");
 leagueCharts.lineChart({
   chartStat: "totalGold",
   chartContext: document.getElementById("gold-advantage-chart"),
-  summonerName: "AudreyRuston",
+  gameName: "AudreyRuston",
+  tagLine: "NA1",
   chartOptions: {
     responsive: false,
   },
@@ -54,7 +56,8 @@ leagueCharts.lineChart({
   const leagueCharts = new LeagueCharts("riot-api-key");
   leagueCharts.scoreboard({
     chartContext: document.getElementById("scoreboard"),
-    summonerName: "AudreyRuston",
+    gameName: "AudreyRuston",
+    tagLine: "NA1",
   });
 ```
 
