@@ -1,6 +1,4 @@
 <p align="center">
-  <a href="https://github.com/davidyorr/league-charts/actions?query=workflow%3A%22Node.js+Package%22"><img src="https://github.com/davidyorr/league-charts/workflows/Node.js%20Package/badge.svg" alt="Node.js Package Status"></a>
-  <a href="https://github.com/davidyorr/league-charts/actions?query=workflow%3A%22Cypress+Image+Snapshots%22"><img src="https://github.com/davidyorr/league-charts/workflows/Cypress%20Image%20Snapshots/badge.svg" alt="Cypress Image Snapshots Status"></a>
   <a href="https://league-charts.vercel.app/storybook/"><img src="https://raw.githubusercontent.com/storybookjs/brand/master/badge/badge-storybook.svg"></a>
 </p>
 
